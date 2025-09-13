@@ -1,0 +1,124 @@
+#!/bin/sh
+set +e
+
+SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/../scripts/common.sh"
+
+log "🔍 Commit message hook: Format validation"
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+log "📝 Original message: $commit_msg"
+
+current_branch=$(get_current_branch)
+
+if [ -f "$(git rev-parse --git-path REBASE_HEAD)" ]; then
+    echo "⚠️  Skipping commit message validation during rebase"
+    exit 0
+fi
+
+if [ -z "$current_branch" ]; then
+    err "❌ ERROR: Could not determine current branch"
+    err "   Commit message validation requires known branch context"
+    exit 1
+fi
+
+if is_system_branch "$current_branch"; then
+    log_is_system_branch "$current_branch"
+    exit 0
+fi
+
+log "🌿 Current branch: $current_branch"
+
+usecase_is_commit_message_valid "$commit_msg" "$current_branch"
+result=$?
+
+case $result in
+    0)
+        log_commit_validation_success "$commit_msg"
+        exit 0
+        ;;
+    1)
+        log "🔧 Commit message needs prefix - attempting autofix"
+        
+        parse_branch_name "$current_branch"
+        branch_parse_result=$?
+        
+        if [ $branch_parse_result -ne 0 ]; then
+            log_branch_invalid_format "$current_branch"
+            err ""
+            log_branch_naming_rules
+            exit 1
+        elif [ $branch_parse_result -eq 2 ]; then
+            log_branch_empty
+            err ""
+            log_branch_naming_rules
+            exit 1
+        fi
+        
+        expected_prefix="$branch_category #$branch_issue:"
+        auto_fixed_msg="$expected_prefix $commit_msg"
+        
+        log "🚀 Auto-fixing commit message:"
+        log "   From: $commit_msg"
+        log "   To:   $auto_fixed_msg"
+        
+        usecase_is_commit_message_valid "$auto_fixed_msg" "$current_branch"
+        autofix_result=$?
+        
+        if [ $autofix_result -eq 0 ]; then
+            echo "$auto_fixed_msg" > "$commit_msg_file"
+            log "✅ Commit message auto-fixed successfully"
+            exit 0
+        else
+            err "❌ ERROR: Auto adding prefix failed - please check commit-msg hook"
+            log_commit_invalid_format "$auto_fixed_msg"
+            err ""
+            log_commit_naming_rules
+            exit 1
+        fi
+        ;;
+    2)
+        log_commit_empty
+        err ""
+        log_commit_naming_rules
+        exit 1
+        ;;
+    3)
+        log_branch_invalid_format
+        err ""
+        log_branch_naming_rules
+        exit 1
+        ;;
+    4)
+        log_branch_empty
+        err ""
+        log_branch_naming_rules
+        exit 1
+        ;;
+    5)
+        log_branch_invalid_description "$branch_description"
+        err ""
+        log_branch_naming_rules
+        exit 1
+        ;;
+    6)
+        log_commit_category_mismatch "$commit_category" "$branch_category"
+        err ""
+        log_commit_naming_rules
+        exit 1
+        ;;
+    7)
+        log_commit_issue_mismatch "$commit_issue" "$branch_issue"
+        err ""
+        log_commit_naming_rules
+        exit 1
+        ;;
+    *)
+        log_unknown_error_code "$result"
+        err ""
+        log_commit_naming_rules
+        exit 1
+        ;;
+esac

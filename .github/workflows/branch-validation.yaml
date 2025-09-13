@@ -1,0 +1,26 @@
+name: Branch and Commit Validation
+
+on:
+  push:
+    branches-ignore: [trunk, main, master]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  validate-branch-and-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate branch format and issue
+        uses: ./.github/actions/validate-branch
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate commit messages
+        uses: ./.github/actions/validate-commit
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
