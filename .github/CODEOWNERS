@@ -1,2 +1,11 @@
+# Global owners
+* @cocahonka
+
+# Frontend and Backend
 /frontend/ @cocahonka
 /backend/ @qquiqlerr
+
+# Infrastructure and Git setup
+/.githooks/ @cocahonka
+/scripts/setup-hooks.sh @cocahonka
+/.github/ @cocahonka

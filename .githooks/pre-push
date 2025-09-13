@@ -1,0 +1,81 @@
+#!/bin/sh
+set +e
+
+SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/../scripts/common.sh"
+
+log "🔍 Pre-push hook: Branch naming enforcement"
+
+validate_push_branch() {
+    local branch_name="$1"
+    
+    if is_system_branch "$branch_name"; then
+        log_is_system_branch "$branch_name"
+        return 0
+    fi
+
+    log "📋 Validating branch: $branch_name"
+    
+    usecase_is_branch_format_valid "$branch_name"
+    local result=$?
+    
+    case $result in
+        0)
+            log_branch_validation_success
+            return 0
+            ;;
+        1)
+            log_branch_invalid_format
+            ;;
+        2)
+            log_branch_empty
+            ;;
+        3)
+            log_branch_invalid_description "$branch_description"
+            ;;
+        *)
+            log_unknown_error_code "$result"
+            ;;
+    esac
+    
+    return 1
+}
+
+processed_branches=0
+failed_branches=""
+
+while read local_ref local_sha remote_ref remote_sha; do
+    processed_branches=$((processed_branches + 1))
+    
+    local_branch="${local_ref#refs/heads/}"
+    remote_branch="${remote_ref#refs/heads/}"
+    
+    log ""
+    log "🌿 Branch $processed_branches: $local_branch → $remote_branch"
+    
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        log "🗑️  Branch deletion - allowing"
+        continue
+    fi
+    
+    if ! validate_push_branch "$local_branch"; then
+        failed_branches="$failed_branches $local_branch"
+        continue
+    fi
+done
+
+if [ $processed_branches -eq 0 ]; then
+    log "📋 No branches to validate"
+fi
+
+if [ -n "$failed_branches" ]; then
+    err ""
+    err "❌ Push rejected due to invalid branch names:$failed_branches"
+    err ""
+    log_branch_naming_rules
+    exit 1
+fi
+
+log ""
+log "🎉 All branches passed naming validation"
+exit 0

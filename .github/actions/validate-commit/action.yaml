@@ -1,0 +1,22 @@
+name: "Validate Commit Messages"
+description: "Validates commit messages format and matches with branch naming"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate commits
+      id: validate
+      shell: bash
+      env:
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        ${{ github.action_path }}/validate-commits.sh

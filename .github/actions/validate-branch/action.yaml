@@ -1,0 +1,65 @@
+name: "Validate Branch Format"
+description: "Validates branch naming convention and checks issue existence"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+
+outputs:
+  valid-format:
+    description: "Whether branch format is valid"
+    value: ${{ steps.validate.outputs.valid_format }}
+  category:
+    description: "Branch category"
+    value: ${{ steps.validate.outputs.category }}
+  issue-number:
+    description: "Issue number"
+    value: ${{ steps.validate.outputs.issue_number }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate branch format
+      id: validate
+      shell: bash
+      env:
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+      run: |
+        output=$(${{ github.action_path }}/validate-branch.sh)
+        echo "$output"
+
+        valid_format=$(echo "$output" | grep "VALID_FORMAT=" | cut -d'=' -f2)
+        category=$(echo "$output" | grep "CATEGORY=" | cut -d'=' -f2)
+        issue_number=$(echo "$output" | grep "ISSUE_NUMBER=" | cut -d'=' -f2)
+
+        echo "valid_format=$valid_format" >> $GITHUB_OUTPUT
+        if [ -n "$category" ]; then
+          echo "category=$category" >> $GITHUB_OUTPUT
+        fi
+        if [ -n "$issue_number" ]; then
+          echo "issue_number=$issue_number" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Check issue existence
+      if: steps.validate.outputs.valid_format == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ISSUE_NUMBER: ${{ steps.validate.outputs.issue_number }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: |
+        ${{ github.action_path }}/check-issue.sh
+
+    - name: Validate category labels
+      if: steps.validate.outputs.valid_format == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ISSUE_NUMBER: ${{ steps.validate.outputs.issue_number }}
+        CATEGORY: ${{ steps.validate.outputs.category }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: |
+        ${{ github.action_path }}/check-labels.sh
