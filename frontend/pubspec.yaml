@@ -1,0 +1,22 @@
+name: hecate
+version: 0.0.0
+
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+  flutter: 3.35.7
+
+workspace:
+  - packages/piv_bindings
+
+dependencies:
+  flutter:
+    sdk: flutter
+  piv_bindings: any
+
+dev_dependencies:
+  coca_lints: 1.0.1
+
+flutter:
+  uses-material-design: true

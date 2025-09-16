@@ -1,0 +1,14 @@
+{
+    "git.openRepositoryInParentFolders": "always",
+    "search.exclude": {
+        "**/.fvm": true,
+        "**/.dart_tool": true
+    },
+    "files.watcherExclude": {
+        "**/.fvm": true
+    },
+    "dart.runPubGetOnPubspecChanges": "never",
+    "dart.env": {
+        "PUB_HOSTED_URL": "https://pub.dev"
+    },
+}
