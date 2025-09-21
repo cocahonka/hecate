@@ -1,0 +1,64 @@
+basePath: /
+definitions:
+  handler.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handler.InitRegisterRequest:
+    properties:
+      nickname:
+        type: string
+    required:
+      - nickname
+    type: object
+  handler.InitRegisterResponse:
+    properties:
+      challenge:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API для сервиса управления пользователями
+  title: User Service API
+  version: "1.0"
+paths:
+  /register/init:
+    post:
+      consumes:
+        - application/json
+      description:
+        Initiate the registration process by providing a nickname and receiving
+        a challenge
+      parameters:
+        - description: Registration initialization request
+          in: body
+          name: request
+          required: true
+          schema:
+            $ref: "#/definitions/handler.InitRegisterRequest"
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Challenge for registration
+          schema:
+            $ref: "#/definitions/handler.InitRegisterResponse"
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: "#/definitions/handler.ErrorResponse"
+        "409":
+          description: Nickname is not unique
+          schema:
+            $ref: "#/definitions/handler.ErrorResponse"
+        "500":
+          description: Internal server error
+          schema:
+            $ref: "#/definitions/handler.ErrorResponse"
+      summary: Initialize user registration
+      tags:
+        - Registration
+schemes:
+  - http
+swagger: "2.0"
