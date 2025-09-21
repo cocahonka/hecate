@@ -40,13 +40,15 @@ const (
 	codeNotPresent    int32 = 1 // no readers/cards present
 	codeTransient     int32 = 2 // temporary pcsc error
 	codeInvalidHandle int32 = 3 // handle not found
+	codePinRequired   int32 = 4 // pin missing/invalid
 )
 
 // simple global registry for open tokens (MVP)
 var (
-	mu            sync.Mutex
-	nextHandle    int64 = 1
-	handleToToken       = map[int64]*pivlib.YubiKey{}
+	mu                sync.Mutex
+	nextHandle        int64 = 1
+	handleToToken           = map[int64]*pivlib.YubiKey{}
+	handlePinVerified       = map[int64]bool{}
 )
 
 func registerToken(yubiKey *pivlib.YubiKey) int64 {
@@ -55,6 +57,7 @@ func registerToken(yubiKey *pivlib.YubiKey) int64 {
 	handleValue := nextHandle
 	nextHandle++
 	handleToToken[handleValue] = yubiKey
+	handlePinVerified[handleValue] = false
 	return handleValue
 }
 
@@ -63,6 +66,7 @@ func takeToken(handleValue int64) *pivlib.YubiKey {
 	defer mu.Unlock()
 	token := handleToToken[handleValue]
 	delete(handleToToken, handleValue)
+	delete(handlePinVerified, handleValue)
 	return token
 }
 
@@ -117,6 +121,24 @@ func go_piv_bindings_device_authenticate(
 	handle C.go_piv_bindings_handle_t,
 	pin *C.char,
 ) C.go_piv_bindings_status_t {
+	handleValue := int64(handle)
+	token, exists := getToken(handleValue)
+	if !exists {
+		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	}
+	if pin == nil || C.GoString(pin) == "" {
+		return toCStatus(err(codePinRequired, "pin required"))
+	}
+	pinStr := C.GoString(pin)
+	if _, metaErr := token.Metadata(pinStr); metaErr != nil {
+		mu.Lock()
+		handlePinVerified[handleValue] = false
+		mu.Unlock()
+		return toCStatus(err(codePinRequired, "pin invalid"))
+	}
+	mu.Lock()
+	handlePinVerified[handleValue] = true
+	mu.Unlock()
 	return toCStatus(ok())
 }
 

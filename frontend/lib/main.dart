@@ -41,6 +41,11 @@ typedef _PivStatusDart =
 typedef _FreeStringNative = ffi.Void Function(ffi.Pointer<ffi.Char> s);
 typedef _FreeStringDart = void Function(ffi.Pointer<ffi.Char> s);
 
+typedef _DeviceAuthNative =
+    GoPivStatus Function(ffi.Int64 handle, ffi.Pointer<ffi.Char> pin);
+typedef _DeviceAuthDart =
+    GoPivStatus Function(int handle, ffi.Pointer<ffi.Char> pin);
+
 void main() {
   final dylibPath = File(
     '${Directory.current.path}/golang_piv_bindings/go_piv_bindings.dylib',
@@ -64,6 +69,9 @@ void main() {
   final freeString = lib.lookupFunction<_FreeStringNative, _FreeStringDart>(
     'go_piv_bindings_free_string',
   );
+  final deviceAuth = lib.lookupFunction<_DeviceAuthNative, _DeviceAuthDart>(
+    'go_piv_bindings_device_authenticate',
+  );
 
   final outHandle = pkgffi.calloc<ffi.Int64>();
   try {
@@ -78,6 +86,24 @@ void main() {
 
     final handle = outHandle.value;
     print('device_open OK, handle=$handle');
+
+    // Ask PIN interactively (enter to skip)
+    stdout.write('Enter PIV PIN (press Enter to skip): ');
+    final pinInput = stdin.readLineSync() ?? '';
+    final pinPtr = pinInput.toNativeUtf8();
+    try {
+      final stAuth = deviceAuth(handle, pinPtr.cast());
+      if (stAuth.code != 0) {
+        final msg = stAuth.msg == ffi.Pointer.fromAddress(0)
+            ? ''
+            : stAuth.msg.toDartString();
+        print('device_authenticate: code=${stAuth.code} msg=$msg');
+      } else {
+        print('device_authenticate OK');
+      }
+    } finally {
+      pkgffi.malloc.free(pinPtr);
+    }
 
     final has9c = pkgffi.calloc<ffi.Int32>();
     final has9d = pkgffi.calloc<ffi.Int32>();
