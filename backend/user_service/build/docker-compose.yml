@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: hecate_postgres
+    environment:
+      POSTGRES_DB: user_service
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
