@@ -11,3 +11,11 @@ services:
     volumes:
       - ./migrations:/docker-entrypoint-initdb.d
     restart: unless-stopped
+
+  redis:
+    image: redis:7
+    command: redis-server --requirepass password
+    container_name: hecate_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
