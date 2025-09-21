@@ -100,3 +100,9 @@ melos_*.yaml
 
 # IDX
 .idx/
+
+# Junk and drafts
+.junk
+
+# Cursor related
+.cursorignore
