@@ -28,6 +28,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+.build/
+.swiftpm/
 
 # Symbolication related
 app.*.symbols

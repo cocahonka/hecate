@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "flutter debug",
+            "name": "Flutter: Debug",
             "request": "launch",
             "type": "dart",
             "cwd": "${workspaceFolder}",
@@ -10,5 +10,16 @@
                 "PUB_HOSTED_URL": "https://pub.dev"
             }
         },
+        {
+            "name": "Dart: Run bin",
+            "request": "launch",
+            "type": "dart",
+            "program": "${workspaceFolder}/bin/main.dart",
+            "console": "terminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PUB_HOSTED_URL": "https://pub.dev"
+            }
+        }
     ]
 }
