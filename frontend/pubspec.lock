@@ -61,4 +61,4 @@ packages:
     version: "2.2.0"
 sdks:
   dart: ">=3.9.2 <4.0.0"
-  flutter: "3.35.3"
+  flutter: "3.35.4"
