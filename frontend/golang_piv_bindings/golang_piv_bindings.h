@@ -50,6 +50,15 @@ go_piv_bindings_status_t go_piv_bindings_piv_status(
   const char** pk_9d_pem
 );
 
+
+// Verify ES256 signature over SHA-256(challenge) using 9c public key (PEM SPKI).
+// Inputs are base64url (no padding) for challenge and signature (DER in base64url).
+go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(
+  const char* pk_9c_pem,
+  const char* challenge_b64url,
+  const char* signature_der_b64url
+);
+
 // Sign an arbitrary challenge using slot 9c with ES256 (ECDSA P-256 + SHA-256).
 // Inputs/outputs are base64url (no '=' padding).
 // challenge_b64url: raw challenge bytes encoded as base64url.

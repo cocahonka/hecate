@@ -64,6 +64,20 @@ typedef _SignDart =
       ffi.Pointer<pkgffi.Utf8> pinUtf8Nullable,
     );
 
+// verify_signature_es256
+typedef _VerifyNative =
+    GoPivStatus Function(
+      ffi.Pointer<pkgffi.Utf8> pk9cPem,
+      ffi.Pointer<pkgffi.Utf8> challengeB64,
+      ffi.Pointer<pkgffi.Utf8> signatureDerB64,
+    );
+typedef _VerifyDart =
+    GoPivStatus Function(
+      ffi.Pointer<pkgffi.Utf8> pk9cPem,
+      ffi.Pointer<pkgffi.Utf8> challengeB64,
+      ffi.Pointer<pkgffi.Utf8> signatureDerB64,
+    );
+
 void main() {
   final dylibPath = File(
     '${Directory.current.path}/golang_piv_bindings/go_piv_bindings.dylib',
@@ -92,6 +106,9 @@ void main() {
   );
   final signChallenge = lib.lookupFunction<_SignNative, _SignDart>(
     'go_piv_bindings_sign_challenge',
+  );
+  final verifyEs256 = lib.lookupFunction<_VerifyNative, _VerifyDart>(
+    'go_piv_bindings_verify_signature_es256',
   );
   // slot9c policy
   final slot9cPolicy = lib
@@ -144,6 +161,7 @@ void main() {
     final has9d = pkgffi.calloc<ffi.Int32>();
     final pk9cPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
     final pk9dPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
+    String? pk9cPemStr;
     try {
       final st = pivStatus(handle, has9c, has9d, pk9cPtr, pk9dPtr);
       if (st.code != 0) {
@@ -158,8 +176,10 @@ void main() {
 
       final pk9c = pk9cPtr.value;
       if (pk9c.address != 0) {
-        final s = pk9c.toDartString();
-        print('pk_9c_pem: ${s.isNotEmpty ? s.split('\n').first : s} ...');
+        pk9cPemStr = pk9c.toDartString();
+        print(
+          'pk_9c_pem: ${pk9cPemStr.isNotEmpty ? pk9cPemStr.split('\n').first : pk9cPemStr} ...',
+        );
         // Free C string
         freeString(pk9c.cast());
       }
@@ -204,6 +224,7 @@ void main() {
     final challengeB64 = base64Url.encode(challenge).replaceAll('=', '');
     final challengePtr = challengeB64.toNativeUtf8();
     final sigOutPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
+    String? sigB64Str;
     try {
       // Pass PIN only if policy requires Always (2)
       final needPinForSign = pinPolicyVal == 2;
@@ -225,9 +246,11 @@ void main() {
         } else {
           final sigPtr = sigOutPtr.value;
           if (sigPtr.address != 0) {
-            final sigB64 = sigPtr.toDartString();
-            final head = sigB64.length > 16 ? sigB64.substring(0, 16) : sigB64;
-            print('sign_challenge OK, len=${sigB64.length} head=$head');
+            sigB64Str = sigPtr.toDartString();
+            final head = sigB64Str.length > 16
+                ? sigB64Str.substring(0, 16)
+                : sigB64Str;
+            print('sign_challenge OK, len=${sigB64Str.length} head=$head');
             freeString(sigPtr.cast());
           } else {
             print('sign_challenge returned empty signature');
@@ -243,6 +266,30 @@ void main() {
     } finally {
       pkgffi.malloc.free(challengePtr);
       pkgffi.calloc.free(sigOutPtr);
+    }
+
+    // Verify signature with pk9c from piv_status (host-side only)
+    if (pk9cPemStr != null && sigB64Str != null) {
+      final pkPtr = pk9cPemStr.toNativeUtf8();
+      final challPtr = challengeB64.toNativeUtf8();
+      final sigPtr = sigB64Str.toNativeUtf8();
+      try {
+        final stV = verifyEs256(pkPtr, challPtr, sigPtr);
+        final msg = stV.msg == ffi.Pointer.fromAddress(0)
+            ? ''
+            : stV.msg.toDartString();
+        if (stV.code == 0) {
+          print('verify_signature_es256 OK (piv_status pk)');
+        } else {
+          print(
+            'verify_signature_es256 failed (piv_status pk): code=${stV.code} msg=$msg',
+          );
+        }
+      } finally {
+        pkgffi.malloc.free(pkPtr);
+        pkgffi.malloc.free(challPtr);
+        pkgffi.malloc.free(sigPtr);
+      }
     }
 
     final stClose = deviceClose(handle);

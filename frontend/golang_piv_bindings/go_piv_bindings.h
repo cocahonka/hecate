@@ -104,6 +104,7 @@ extern go_piv_bindings_status_t go_piv_bindings_decrypt_message(go_piv_bindings_
 extern go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(go_piv_bindings_handle_t handle, int32_t* pinPolicy, int32_t* touchPolicy);
 extern void go_piv_bindings_free_string(char* s);
 extern void go_piv_bindings_free_string_array(char** arr, int32_t n);
+extern go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(char* pkPem, char* challengeB64, char* signatureDerB64);
 
 #ifdef __cplusplus
 }

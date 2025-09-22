@@ -11,6 +11,7 @@ package main
 import "C"
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -167,20 +168,41 @@ func go_piv_bindings_piv_status(
 		return toCStatus(err(codeInvalidHandle, "invalid handle"))
 	}
 
-	// helper: set has flag and PEM SPKI from certificate if present
-	setFromCert := func(slot pivlib.Slot, has *C.int32_t, out **C.char) {
-		if cert, e := token.Certificate(slot); e == nil && cert != nil {
+	// helper: set has flag and PEM SPKI from source
+	setPem := func(pubAny interface{}, has *C.int32_t, out **C.char) {
+		if pubAny == nil {
+			return
+		}
+		spki, _ := x509.MarshalPKIXPublicKey(pubAny)
+		pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: spki})
+		if len(pemBytes) > 0 {
 			*has = 1
-			spki, _ := x509.MarshalPKIXPublicKey(cert.PublicKey)
-			pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: spki})
-			if len(pemBytes) > 0 {
-				*out = C.CString(string(pemBytes))
-			}
+			*out = C.CString(string(pemBytes))
 		}
 	}
 
-	setFromCert(pivlib.SlotSignature, has9c, pk9c)     // 9c
-	setFromCert(pivlib.SlotKeyManagement, has9d, pk9d) // 9d
+	// Prefer attested pk for 9c (source of truth). Fallback to certificate.
+	{
+		var pub interface{}
+		if attCert, e := token.AttestationCertificate(); e == nil && attCert != nil {
+			if slotCert, e2 := token.Attest(pivlib.SlotSignature); e2 == nil && slotCert != nil {
+				if _, vErr := pivlib.Verify(attCert, slotCert); vErr == nil {
+					pub = slotCert.PublicKey
+				}
+			}
+		}
+		if pub == nil {
+			if cert, e := token.Certificate(pivlib.SlotSignature); e == nil && cert != nil {
+				pub = cert.PublicKey
+			}
+		}
+		setPem(pub, has9c, pk9c)
+	}
+
+	// For 9d keep certificate path in MVP
+	if cert, e := token.Certificate(pivlib.SlotKeyManagement); e == nil && cert != nil {
+		setPem(cert.PublicKey, has9d, pk9d)
+	}
 
 	return toCStatus(ok())
 }
@@ -349,3 +371,53 @@ func go_piv_bindings_free_string_array(
 }
 
 func main() {}
+
+//export go_piv_bindings_verify_signature_es256
+func go_piv_bindings_verify_signature_es256(
+	pkPem *C.char,
+	challengeB64 *C.char,
+	signatureDerB64 *C.char,
+) C.go_piv_bindings_status_t {
+	if pkPem == nil || C.GoString(pkPem) == "" {
+		return toCStatus(err(codeTransient, "empty public key"))
+	}
+	if challengeB64 == nil || C.GoString(challengeB64) == "" {
+		return toCStatus(err(codeTransient, "empty challenge"))
+	}
+	if signatureDerB64 == nil || C.GoString(signatureDerB64) == "" {
+		return toCStatus(err(codeTransient, "empty signature"))
+	}
+
+	// Parse public key (PEM SPKI)
+	pemBlock, _ := pem.Decode([]byte(C.GoString(pkPem)))
+	if pemBlock == nil || pemBlock.Type != "PUBLIC KEY" {
+		return toCStatus(err(codeTransient, "invalid public key pem"))
+	}
+	pubAny, perr := x509.ParsePKIXPublicKey(pemBlock.Bytes)
+	if perr != nil {
+		return toCStatus(err(codeTransient, "invalid public key spki"))
+	}
+	ecPub, parsed := pubAny.(*ecdsa.PublicKey)
+	if !parsed || ecPub.Curve == nil {
+		return toCStatus(err(codeTransient, "public key is not ecdsa p-256"))
+	}
+
+	// Decode inputs
+	challStr := C.GoString(challengeB64)
+	challBytes, decErr := base64.RawURLEncoding.DecodeString(challStr)
+	if decErr != nil {
+		return toCStatus(err(codeTransient, "invalid base64url challenge"))
+	}
+	sigStr := C.GoString(signatureDerB64)
+	sigDer, sigDecErr := base64.RawURLEncoding.DecodeString(sigStr)
+	if sigDecErr != nil {
+		return toCStatus(err(codeTransient, "invalid base64url signature"))
+	}
+
+	// Hash and verify (DER signature)
+	digest := sha256.Sum256(challBytes)
+	if valid := ecdsa.VerifyASN1(ecPub, digest[:], sigDer); !valid {
+		return toCStatus(err(codeTransient, "signature verification failed"))
+	}
+	return toCStatus(ok())
+}
