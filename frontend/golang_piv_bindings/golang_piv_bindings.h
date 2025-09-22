@@ -27,6 +27,15 @@ typedef struct {
   const char* msg;
 } go_piv_bindings_status_t;
 
+// Status codes (go_piv_bindings_status_t.code)
+// 0  = OK
+// 1  = NOT_PRESENT     (no readers/cards present)
+// 2  = TRANSIENT       (temporary/IO/format error)
+// 3  = INVALID_HANDLE  (session/handle not found)
+// 4  = PIN_REQUIRED    (PIN missing/invalid)
+// 6  = SLOT_EMPTY      (key/cert absent in slot)
+// 7  = UNKNOWN_POLICY  (cannot determine slot policies)
+
 // Open the first available PIV device (or a device selected internally).
 // On success, out_handle receives a valid non-zero handle.
 go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_handle_t* out_handle);
@@ -34,14 +43,17 @@ go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_handle_t* o
 // Close a previously opened device/session and release resources.
 go_piv_bindings_status_t go_piv_bindings_device_close(go_piv_bindings_handle_t handle);
 
-// Verify the PIV PIN once per session (if required by slot policy).
-// pin_utf8: null-terminated UTF-8 string; not persisted or logged by the implementation.
+// Helper to verify the PIV PIN once per session (allows YubiKey to cache PIN if policy permits).
+// pin_utf8: null-terminated UTF-8 string; never persisted or logged by the implementation.
+// Can be called at startup so subsequent operations do not require passing the PIN explicitly
+// when the slot's PIN policy is Once. For Always policy, pass the PIN to operations directly.
 go_piv_bindings_status_t go_piv_bindings_device_authenticate(go_piv_bindings_handle_t handle, const char* pin_utf8);
 
 // Query presence of keys in slots 9c and 9d and retrieve their public keys when present.
 // has_9c / has_9d: 0 or 1.
-// pk_9c_pem / pk_9d_pem: PEM-encoded SPKI public keys; when non-null, the caller
-// must free each string via go_piv_bindings_free_string.
+// pk_9c_pem / pk_9d_pem: out-parameters for PEM-encoded SPKI public keys (null-terminated C-strings).
+// When non-null on success, the library allocates each string; the caller MUST free them using
+// go_piv_bindings_free_string to avoid memory leaks.
 go_piv_bindings_status_t go_piv_bindings_piv_status(
   go_piv_bindings_handle_t handle,
   int32_t* has_9c,
@@ -51,8 +63,8 @@ go_piv_bindings_status_t go_piv_bindings_piv_status(
 );
 
 
-// Verify ES256 signature over SHA-256(challenge) using 9c public key (PEM SPKI).
-// Inputs are base64url (no padding) for challenge and signature (DER in base64url).
+// Verify ES256 signature over SHA-256(challenge) using 9c public key supplied in PEM SPKI format.
+// Inputs are base64url (no padding) for challenge and for signature (DER-encoded ECDSA signature in base64url).
 go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(
   const char* pk_9c_pem,
   const char* challenge_b64url,
