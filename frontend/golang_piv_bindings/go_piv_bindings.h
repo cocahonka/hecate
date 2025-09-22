@@ -97,10 +97,11 @@ extern go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_hand
 extern go_piv_bindings_status_t go_piv_bindings_device_close(go_piv_bindings_handle_t handle);
 extern go_piv_bindings_status_t go_piv_bindings_device_authenticate(go_piv_bindings_handle_t handle, char* pin);
 extern go_piv_bindings_status_t go_piv_bindings_piv_status(go_piv_bindings_handle_t handle, int32_t* has9c, int32_t* has9d, char** pk9c, char** pk9d);
-extern go_piv_bindings_status_t go_piv_bindings_sign_challenge(go_piv_bindings_handle_t handle, char* challenge, char** sig);
+extern go_piv_bindings_status_t go_piv_bindings_sign_challenge(go_piv_bindings_handle_t handle, char* challenge, char** sig, char* pinOpt);
 extern go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(char** recipients, int32_t n, char*** encKeys, int32_t* encN);
 extern go_piv_bindings_status_t go_piv_bindings_encrypt_message(go_piv_bindings_handle_t handle, char* encAES, char* pt, char* aad, char** envelope);
 extern go_piv_bindings_status_t go_piv_bindings_decrypt_message(go_piv_bindings_handle_t handle, char* encAES, char* envelope, char** pt);
+extern go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(go_piv_bindings_handle_t handle, int32_t* pinPolicy, int32_t* touchPolicy);
 extern void go_piv_bindings_free_string(char* s);
 extern void go_piv_bindings_free_string_array(char** arr, int32_t n);
 

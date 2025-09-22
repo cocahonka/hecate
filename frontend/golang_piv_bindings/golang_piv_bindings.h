@@ -54,10 +54,12 @@ go_piv_bindings_status_t go_piv_bindings_piv_status(
 // Inputs/outputs are base64url (no '=' padding).
 // challenge_b64url: raw challenge bytes encoded as base64url.
 // signature_b64url: DER-encoded ECDSA signature encoded as base64url; must be freed.
+// pin_utf8_nullable: optional UTF-8 PIN; pass NULL when not needed (e.g., PINPolicyNever/Once after authenticate).
 go_piv_bindings_status_t go_piv_bindings_sign_challenge(
   go_piv_bindings_handle_t handle,
   const char* challenge_b64url,
-  const char** signature_b64url
+  const char** signature_b64url,
+  const char* pin_utf8_nullable
 );
 
 // Generate an ephemeral AES-256 key and return one wrapped enc_aes per recipient using RSA-OAEP-256.
@@ -86,6 +88,16 @@ go_piv_bindings_status_t go_piv_bindings_decrypt_message(
   const char* enc_aes_b64url,
   const char* envelope_json,
   const char** plaintext_b64url
+);
+
+// Query slot 9c policies. Returns numeric policies:
+// pin_policy  : 0=Never, 1=Once, 2=Always
+// touch_policy: 0=Never, 1=Always, 2=Cached
+// If policies cannot be determined (e.g., attestation unsupported), returns status.code=7 (unknown policy).
+go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(
+  go_piv_bindings_handle_t handle,
+  int32_t* pin_policy,
+  int32_t* touch_policy
 );
 
 // Free a single string previously allocated and returned by the library.

@@ -10,7 +10,11 @@ package main
 // } go_piv_bindings_status_t;
 import "C"
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"sync"
 	"unsafe"
@@ -41,6 +45,8 @@ const (
 	codeTransient     int32 = 2 // temporary pcsc error
 	codeInvalidHandle int32 = 3 // handle not found
 	codePinRequired   int32 = 4 // pin missing/invalid
+	codeSlotEmpty     int32 = 6 // slot has no key/cert
+	codeUnknownPolicy int32 = 7 // policy could not be determined
 )
 
 // simple global registry for open tokens (MVP)
@@ -184,8 +190,52 @@ func go_piv_bindings_sign_challenge(
 	handle C.go_piv_bindings_handle_t,
 	challenge *C.char,
 	sig **C.char,
+	pinOpt *C.char,
 ) C.go_piv_bindings_status_t {
-	*sig = C.CString("")
+	*sig = nil
+	handleValue := int64(handle)
+	token, exists := getToken(handleValue)
+	if !exists {
+		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	}
+	if challenge == nil {
+		return toCStatus(err(codeTransient, "empty challenge"))
+	}
+	// Read certificate from 9c
+	cert, certErr := token.Certificate(pivlib.SlotSignature)
+	if certErr != nil || cert == nil {
+		return toCStatus(err(codeSlotEmpty, "slot 9c empty"))
+	}
+	// Build auth (provide PIN only if previously verified)
+	var auth pivlib.KeyAuth
+	if pinOpt != nil {
+		if p := C.GoString(pinOpt); p != "" {
+			auth = pivlib.KeyAuth{PIN: p}
+		}
+	} else if handlePinVerified[handleValue] {
+		// For PINPolicyOnce flows we already verified PIN via device_authenticate.
+		auth = pivlib.KeyAuth{}
+	}
+	// Get signer for 9c
+	signer, pkErr := token.PrivateKey(pivlib.SlotSignature, cert.PublicKey, auth)
+	if pkErr != nil {
+		return toCStatus(err(codePinRequired, "pin required"))
+	}
+	// Decode challenge (base64url no padding)
+	challStr := C.GoString(challenge)
+	challBytes, decErr := base64.RawURLEncoding.DecodeString(challStr)
+	if decErr != nil {
+		return toCStatus(err(codeTransient, "invalid base64url challenge"))
+	}
+	// Sign SHA-256(challenge)
+	digest := sha256.Sum256(challBytes)
+	derSig, signErr := signer.(crypto.Signer).Sign(rand.Reader, digest[:], crypto.SHA256)
+	if signErr != nil {
+		return toCStatus(err(codeTransient, "sign error: "+signErr.Error()))
+	}
+	// Return base64url encoded DER signature
+	sigB64 := base64.RawURLEncoding.EncodeToString(derSig)
+	*sig = C.CString(sigB64)
 	return toCStatus(ok())
 }
 
@@ -221,6 +271,56 @@ func go_piv_bindings_decrypt_message(
 	pt **C.char,
 ) C.go_piv_bindings_status_t {
 	*pt = C.CString("")
+	return toCStatus(ok())
+}
+
+//export go_piv_bindings_piv_slot9c_policy
+func go_piv_bindings_piv_slot9c_policy(
+	handle C.go_piv_bindings_handle_t,
+	pinPolicy *C.int32_t,
+	touchPolicy *C.int32_t,
+) C.go_piv_bindings_status_t {
+	*pinPolicy = 0
+	*touchPolicy = 0
+	handleValue := int64(handle)
+	token, exists := getToken(handleValue)
+	if !exists {
+		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	}
+	// Try attestation; if unsupported, return transient.
+	attCert, attErr := token.AttestationCertificate()
+	if attErr != nil || attCert == nil {
+		return toCStatus(err(codeUnknownPolicy, "attestation cert unavailable"))
+	}
+	slotCert, slotErr := token.Attest(pivlib.SlotSignature)
+	if slotErr != nil || slotCert == nil {
+		return toCStatus(err(codeUnknownPolicy, "slot attestation unavailable"))
+	}
+	att, verifyErr := pivlib.Verify(attCert, slotCert)
+	if verifyErr != nil {
+		return toCStatus(err(codeUnknownPolicy, "attestation verify failed"))
+	}
+	// Map to int32 values per header doc
+	switch att.PINPolicy {
+	case pivlib.PINPolicyNever:
+		*pinPolicy = 0
+	case pivlib.PINPolicyOnce:
+		*pinPolicy = 1
+	case pivlib.PINPolicyAlways:
+		*pinPolicy = 2
+	default:
+		return toCStatus(err(codeUnknownPolicy, "unknown pin policy"))
+	}
+	switch att.TouchPolicy {
+	case pivlib.TouchPolicyNever:
+		*touchPolicy = 0
+	case pivlib.TouchPolicyAlways:
+		*touchPolicy = 1
+	case pivlib.TouchPolicyCached:
+		*touchPolicy = 2
+	default:
+		return toCStatus(err(codeUnknownPolicy, "unknown touch policy"))
+	}
 	return toCStatus(ok())
 }
 
