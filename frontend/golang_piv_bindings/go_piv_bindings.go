@@ -1,12 +1,11 @@
 package main
 
-// #cgo CFLAGS: -DPIVGO
 // #include <stdlib.h>
 // #include <stdint.h>
 // typedef int64_t go_piv_bindings_handle_t;
 // typedef struct {
 //   int32_t code;
-//   const char* msg;
+//   const char* message;
 // } go_piv_bindings_status_t;
 import "C"
 import (
@@ -23,91 +22,118 @@ import (
 	pivlib "github.com/go-piv/piv-go/v2/piv"
 )
 
-type status struct {
-	code int32
-	msg  string
-}
+func main() {}
 
-func ok() status                        { return status{0, ""} }
-func err(code int32, msg string) status { return status{code, msg} }
+type StatusCode int32
 
-func toCStatus(s status) C.go_piv_bindings_status_t {
-	cmsg := (*C.char)(nil)
-	if s.msg != "" {
-		cmsg = C.CString(s.msg)
-	}
-	return C.go_piv_bindings_status_t{code: C.int32_t(s.code), msg: cmsg}
-}
-
-// error codes (mapped to status.code)
 const (
-	codeOK            int32 = 0
-	codeNotPresent    int32 = 1 // no readers/cards present
-	codeTransient     int32 = 2 // temporary pcsc error
-	codeInvalidHandle int32 = 3 // handle not found
-	codePinRequired   int32 = 4 // pin missing/invalid
-	codeSlotEmpty     int32 = 6 // slot has no key/cert
-	codeUnknownPolicy int32 = 7 // policy could not be determined
+	codeNotPresent    StatusCode = 1 // no readers/cards present
+	codeTransient     StatusCode = 2 // temporary pcsc error
+	codeInvalidHandle StatusCode = 3 // handle not found
+	codePinRequired   StatusCode = 4 // pin missing/invalid
+	codeInvalidInput  StatusCode = 5 // invalid input/format
+	codeSlotEmpty     StatusCode = 6 // slot has no key/cert
+	codeUnknownPolicy StatusCode = 7 // policy could not be determined
+	codeInternalError StatusCode = 8 // internal processing error
 )
 
-// simple global registry for open tokens (MVP)
+func ok() C.go_piv_bindings_status_t {
+	return C.go_piv_bindings_status_t{code: C.int32_t(0), message: nil}
+}
+
+func err(code StatusCode, message string) C.go_piv_bindings_status_t {
+	cmessage := (*C.char)(nil)
+	if message != "" {
+		cmessage = C.CString(message)
+	}
+	return C.go_piv_bindings_status_t{code: C.int32_t(code), message: cmessage}
+}
+
+// simple global registry for open sessions (MVP)
 var (
-	mu                sync.Mutex
-	nextHandle        int64 = 1
-	handleToToken           = map[int64]*pivlib.YubiKey{}
-	handlePinVerified       = map[int64]bool{}
+	globalMutex     sync.Mutex
+	nextHandle      int64 = 1
+	handleToSession       = map[int64]*Session{}
 )
 
-func registerToken(yubiKey *pivlib.YubiKey) int64 {
-	mu.Lock()
-	defer mu.Unlock()
-	handleValue := nextHandle
+// session serializes operations per handle and carries PIN verification flag
+type Session struct {
+	yubiKey       *pivlib.YubiKey
+	mutex         sync.Mutex
+	isPinVerified bool
+}
+
+func registerSession(yubiKey *pivlib.YubiKey) int64 {
+	globalMutex.Lock()
+	defer globalMutex.Unlock()
+	handleId := nextHandle
 	nextHandle++
-	handleToToken[handleValue] = yubiKey
-	handlePinVerified[handleValue] = false
-	return handleValue
+	handleToSession[handleId] = &Session{yubiKey: yubiKey}
+	return handleId
 }
 
-func takeToken(handleValue int64) *pivlib.YubiKey {
-	mu.Lock()
-	defer mu.Unlock()
-	token := handleToToken[handleValue]
-	delete(handleToToken, handleValue)
-	delete(handlePinVerified, handleValue)
-	return token
+func closeSession(handleId int64) *Session {
+	globalMutex.Lock()
+	defer globalMutex.Unlock()
+	session := handleToSession[handleId]
+	delete(handleToSession, handleId)
+	return session
 }
 
-func getToken(handleValue int64) (*pivlib.YubiKey, bool) {
-	mu.Lock()
-	defer mu.Unlock()
-	token, exists := handleToToken[handleValue]
-	return token, exists
+func getSession(handleId int64) (*Session, bool) {
+	globalMutex.Lock()
+	defer globalMutex.Unlock()
+	session, exists := handleToSession[handleId]
+	return session, exists
+}
+
+func validateHandleAndGetYubiKey(handle C.go_piv_bindings_handle_t) (*pivlib.YubiKey, *Session, C.go_piv_bindings_status_t) {
+	handleId := int64(handle)
+	session, exists := getSession(handleId)
+	if !exists || session == nil {
+		return nil, nil, err(codeInvalidHandle, "invalid handle")
+	}
+	session.mutex.Lock()
+	yubiKey := session.yubiKey
+	session.mutex.Unlock()
+	if yubiKey == nil {
+		return nil, nil, err(codeInvalidHandle, "invalid handle")
+	}
+	return yubiKey, session, ok()
 }
 
 //export go_piv_bindings_device_open
 func go_piv_bindings_device_open(
-	out *C.go_piv_bindings_handle_t,
+	outHandle *C.go_piv_bindings_handle_t,
 ) C.go_piv_bindings_status_t {
-	cards, errCards := pivlib.Cards()
-	if errCards != nil {
-		return toCStatus(err(codeTransient, "pcsc error"))
+	cards, cardsErr := pivlib.Cards()
+	if cardsErr != nil {
+		return err(codeTransient, "failed to enumerate card readers: "+cardsErr.Error())
 	}
 	if len(cards) == 0 {
-		return toCStatus(err(codeNotPresent, "no piv readers"))
+		return err(codeNotPresent, "no card readers found")
 	}
+
 	var yubiKey *pivlib.YubiKey
+	var lastOpenErr error
 	for _, readerName := range cards {
 		if openedKey, openErr := pivlib.Open(readerName); openErr == nil && openedKey != nil {
 			yubiKey = openedKey
 			break
+		} else if openErr != nil {
+			lastOpenErr = openErr
 		}
 	}
+
 	if yubiKey == nil {
-		return toCStatus(err(codeNotPresent, "no piv token openable"))
+		if lastOpenErr != nil {
+			return err(codeNotPresent, "no PIV tokens available, last error: "+lastOpenErr.Error())
+		}
+		return err(codeNotPresent, "no PIV tokens found in available readers")
 	}
-	handleValue := registerToken(yubiKey)
-	*out = C.go_piv_bindings_handle_t(handleValue)
-	return toCStatus(ok())
+	handleId := registerSession(yubiKey)
+	*outHandle = C.go_piv_bindings_handle_t(handleId)
+	return ok()
 }
 
 //export go_piv_bindings_device_close
@@ -115,309 +141,329 @@ func go_piv_bindings_device_close(
 	handle C.go_piv_bindings_handle_t,
 ) C.go_piv_bindings_status_t {
 	// idempotent close: remove if present, but always return OK
-	handleValue := int64(handle)
-	token := takeToken(handleValue)
-	if token != nil {
-		_ = token.Close()
+	handleId := int64(handle)
+	session := closeSession(handleId)
+	if session != nil {
+		session.mutex.Lock()
+		if session.yubiKey != nil {
+			_ = session.yubiKey.Close()
+			session.yubiKey = nil
+		}
+		session.mutex.Unlock()
 	}
-	return toCStatus(ok())
+	return ok()
 }
 
 //export go_piv_bindings_device_authenticate
 func go_piv_bindings_device_authenticate(
 	handle C.go_piv_bindings_handle_t,
-	pin *C.char,
+	pinUtf8 *C.char,
 ) C.go_piv_bindings_status_t {
-	handleValue := int64(handle)
-	token, exists := getToken(handleValue)
-	if !exists {
-		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	if pinUtf8 == nil || C.GoString(pinUtf8) == "" {
+		return err(codePinRequired, "PIN required")
 	}
-	if pin == nil || C.GoString(pin) == "" {
-		return toCStatus(err(codePinRequired, "pin required"))
+
+	yubiKey, session, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return status
 	}
-	pinStr := C.GoString(pin)
-	if _, metaErr := token.Metadata(pinStr); metaErr != nil {
-		mu.Lock()
-		handlePinVerified[handleValue] = false
-		mu.Unlock()
-		return toCStatus(err(codePinRequired, "pin invalid"))
+
+	pinString := C.GoString(pinUtf8)
+	session.mutex.Lock()
+	defer session.mutex.Unlock()
+
+	if _, metadataErr := yubiKey.Metadata(pinString); metadataErr != nil {
+		session.isPinVerified = false
+		return err(codePinRequired, "PIN verification failed: "+metadataErr.Error())
 	}
-	mu.Lock()
-	handlePinVerified[handleValue] = true
-	mu.Unlock()
-	return toCStatus(ok())
+
+	session.isPinVerified = true
+	return ok()
 }
 
 //export go_piv_bindings_piv_status
 func go_piv_bindings_piv_status(
 	handle C.go_piv_bindings_handle_t,
-	has9c *C.int32_t,
-	has9d *C.int32_t,
-	pk9c **C.char,
-	pk9d **C.char,
+	outHas9c *C.int32_t,
+	outHas9d *C.int32_t,
+	outPk9c **C.char,
+	outPk9d **C.char,
 ) C.go_piv_bindings_status_t {
-	*has9c = 0
-	*has9d = 0
-	*pk9c = nil
-	*pk9d = nil
+	*outHas9c = 0
+	*outHas9d = 0
+	*outPk9c = nil
+	*outPk9d = nil
 
-	handleValue := int64(handle)
-	token, found := getToken(handleValue)
-	if !found {
-		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	yubiKey, _, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return status
 	}
 
-	// helper: set has flag and PEM SPKI from source
-	setPem := func(pubAny interface{}, has *C.int32_t, out **C.char) {
-		if pubAny == nil {
-			return
+	// helper: set has flag and PEM SPKI from public key
+	writePemPublicKey := func(publicKey interface{}, has *C.int32_t, out **C.char, slotName string) C.go_piv_bindings_status_t {
+		if publicKey == nil {
+			return ok()
 		}
-		spki, _ := x509.MarshalPKIXPublicKey(pubAny)
+		spki, marshalErr := x509.MarshalPKIXPublicKey(publicKey)
+		if marshalErr != nil {
+			return err(codeInternalError, "failed to marshal public key for "+slotName+": "+marshalErr.Error())
+		}
 		pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: spki})
 		if len(pemBytes) > 0 {
 			*has = 1
 			*out = C.CString(string(pemBytes))
 		}
+		return ok()
 	}
 
-	// Prefer attested pk for 9c (source of truth). Fallback to certificate.
-	{
-		var pub interface{}
-		if attCert, e := token.AttestationCertificate(); e == nil && attCert != nil {
-			if slotCert, e2 := token.Attest(pivlib.SlotSignature); e2 == nil && slotCert != nil {
-				if _, vErr := pivlib.Verify(attCert, slotCert); vErr == nil {
-					pub = slotCert.PublicKey
-				}
-			}
+	// get public key from slot 9c certificate (always use current certificate)
+	if certificate, certificateErr := yubiKey.Certificate(pivlib.SlotSignature); certificateErr != nil {
+		return err(codeTransient, "failed to read certificate from slot 9c: "+certificateErr.Error())
+	} else if certificate != nil {
+		if status := writePemPublicKey(certificate.PublicKey, outHas9c, outPk9c, "slot 9c"); status.code != 0 {
+			return status
 		}
-		if pub == nil {
-			if cert, e := token.Certificate(pivlib.SlotSignature); e == nil && cert != nil {
-				pub = cert.PublicKey
-			}
+	}
+
+	// get public key from slot 9d certificate
+	if certificate, certificateErr := yubiKey.Certificate(pivlib.SlotKeyManagement); certificateErr != nil {
+		return err(codeTransient, "failed to read certificate from slot 9d: "+certificateErr.Error())
+	} else if certificate != nil {
+		if status := writePemPublicKey(certificate.PublicKey, outHas9d, outPk9d, "slot 9d"); status.code != 0 {
+			return status
 		}
-		setPem(pub, has9c, pk9c)
 	}
 
-	// For 9d keep certificate path in MVP
-	if cert, e := token.Certificate(pivlib.SlotKeyManagement); e == nil && cert != nil {
-		setPem(cert.PublicKey, has9d, pk9d)
-	}
-
-	return toCStatus(ok())
+	return ok()
 }
 
 //export go_piv_bindings_sign_challenge
 func go_piv_bindings_sign_challenge(
 	handle C.go_piv_bindings_handle_t,
-	challenge *C.char,
-	sig **C.char,
-	pinOpt *C.char,
+	challengeBase64url *C.char,
+	outSignatureDerBase64url **C.char,
+	pinUtf8OrNull *C.char,
 ) C.go_piv_bindings_status_t {
-	*sig = nil
-	handleValue := int64(handle)
-	token, exists := getToken(handleValue)
-	if !exists {
-		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	*outSignatureDerBase64url = nil
+
+	if challengeBase64url == nil {
+		return err(codeInvalidInput, "empty challenge")
 	}
-	if challenge == nil {
-		return toCStatus(err(codeTransient, "empty challenge"))
+
+	yubiKey, session, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return status
 	}
-	// Read certificate from 9c
-	cert, certErr := token.Certificate(pivlib.SlotSignature)
-	if certErr != nil || cert == nil {
-		return toCStatus(err(codeSlotEmpty, "slot 9c empty"))
+
+	session.mutex.Lock()
+	defer session.mutex.Unlock()
+
+	// read certificate from slot 9c (signature slot)
+	certificate, certificateErr := yubiKey.Certificate(pivlib.SlotSignature)
+	if certificateErr != nil {
+		return err(codeSlotEmpty, "failed to read certificate from slot 9c: "+certificateErr.Error())
 	}
-	// Build auth (provide PIN only if previously verified)
+	if certificate == nil {
+		return err(codeSlotEmpty, "no certificate found in slot 9c")
+	}
+
+	// build authentication object based on PIN policy
 	var auth pivlib.KeyAuth
-	if pinOpt != nil {
-		if p := C.GoString(pinOpt); p != "" {
-			auth = pivlib.KeyAuth{PIN: p}
+	if pinUtf8OrNull != nil {
+		if pinString := C.GoString(pinUtf8OrNull); pinString != "" {
+			auth = pivlib.KeyAuth{PIN: pinString}
 		}
-	} else if handlePinVerified[handleValue] {
-		// For PINPolicyOnce flows we already verified PIN via device_authenticate.
+	} else if session.isPinVerified {
+		// for PINPolicyOnce flows we already verified PIN via device_authenticate
 		auth = pivlib.KeyAuth{}
 	}
-	// Get signer for 9c
-	signer, pkErr := token.PrivateKey(pivlib.SlotSignature, cert.PublicKey, auth)
-	if pkErr != nil {
-		return toCStatus(err(codePinRequired, "pin required"))
+
+	// get signer object for slot 9c private key
+	signer, privateKeyErr := yubiKey.PrivateKey(pivlib.SlotSignature, certificate.PublicKey, auth)
+	if privateKeyErr != nil {
+		return err(codePinRequired, "failed to access private key: "+privateKeyErr.Error())
 	}
-	// Decode challenge (base64url no padding)
-	challStr := C.GoString(challenge)
-	challBytes, decErr := base64.RawURLEncoding.DecodeString(challStr)
-	if decErr != nil {
-		return toCStatus(err(codeTransient, "invalid base64url challenge"))
+
+	// decode challenge from base64url (no padding)
+	challengeString := C.GoString(challengeBase64url)
+	challengeBytes, decodeErr := base64.RawURLEncoding.DecodeString(challengeString)
+	if decodeErr != nil {
+		return err(codeInvalidInput, "failed to decode challenge from base64url: "+decodeErr.Error())
 	}
-	// Sign SHA-256(challenge)
-	digest := sha256.Sum256(challBytes)
-	derSig, signErr := signer.(crypto.Signer).Sign(rand.Reader, digest[:], crypto.SHA256)
+
+	// sign SHA-256 hash of challenge data (ES256 algorithm)
+	digest := sha256.Sum256(challengeBytes)
+	derSignature, signErr := signer.(crypto.Signer).Sign(rand.Reader, digest[:], crypto.SHA256)
 	if signErr != nil {
-		return toCStatus(err(codeTransient, "sign error: "+signErr.Error()))
+		return err(codeTransient, "sign error: "+signErr.Error())
 	}
-	// Return base64url encoded DER signature
-	sigB64 := base64.RawURLEncoding.EncodeToString(derSig)
-	*sig = C.CString(sigB64)
-	return toCStatus(ok())
+
+	// return DER signature encoded as base64url
+	signatureBase64url := base64.RawURLEncoding.EncodeToString(derSignature)
+	*outSignatureDerBase64url = C.CString(signatureBase64url)
+	return ok()
 }
 
 //export go_piv_bindings_wrap_aes_for_recipients
 func go_piv_bindings_wrap_aes_for_recipients(
-	recipients **C.char,
-	n C.int32_t,
-	encKeys ***C.char,
-	encN *C.int32_t,
+	recipientsPk9dPem **C.char,
+	recipientsCount C.int32_t,
+	outEncryptedKeysBase64url ***C.char,
+	outEncryptedKeysCount *C.int32_t,
 ) C.go_piv_bindings_status_t {
-	*encN = 0
-	*encKeys = nil
-	return toCStatus(ok())
+	*outEncryptedKeysCount = 0
+	*outEncryptedKeysBase64url = nil
+	return ok()
 }
 
 //export go_piv_bindings_encrypt_message
 func go_piv_bindings_encrypt_message(
 	handle C.go_piv_bindings_handle_t,
-	encAES *C.char,
-	pt *C.char,
-	aad *C.char,
-	envelope **C.char,
+	encryptedAesBase64url *C.char,
+	plaintextBase64url *C.char,
+	aadBase64url *C.char,
+	outEncryptedEnvelopeJson **C.char,
 ) C.go_piv_bindings_status_t {
-	*envelope = C.CString("{\"enc\":\"A256GCM\",\"iv\":\"\",\"ct\":\"\",\"tag\":\"\"}")
-	return toCStatus(ok())
+	*outEncryptedEnvelopeJson = C.CString("{\"encrypted\":\"A256GCM\",\"iv\":\"\",\"ciphertext\":\"\",\"tag\":\"\"}")
+	return ok()
 }
 
 //export go_piv_bindings_decrypt_message
 func go_piv_bindings_decrypt_message(
 	handle C.go_piv_bindings_handle_t,
-	encAES *C.char,
-	envelope *C.char,
-	pt **C.char,
+	encryptedAesBase64url *C.char,
+	envelopeJson *C.char,
+	outPlaintextBase64url **C.char,
 ) C.go_piv_bindings_status_t {
-	*pt = C.CString("")
-	return toCStatus(ok())
+	*outPlaintextBase64url = C.CString("")
+	return ok()
 }
 
 //export go_piv_bindings_piv_slot9c_policy
 func go_piv_bindings_piv_slot9c_policy(
 	handle C.go_piv_bindings_handle_t,
-	pinPolicy *C.int32_t,
-	touchPolicy *C.int32_t,
+	outPinPolicy *C.int32_t,
+	outTouchPolicy *C.int32_t,
 ) C.go_piv_bindings_status_t {
-	*pinPolicy = 0
-	*touchPolicy = 0
-	handleValue := int64(handle)
-	token, exists := getToken(handleValue)
-	if !exists {
-		return toCStatus(err(codeInvalidHandle, "invalid handle"))
+	*outPinPolicy = 0
+	*outTouchPolicy = 0
+
+	yubiKey, _, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return status
 	}
-	// Try attestation; if unsupported, return transient.
-	attCert, attErr := token.AttestationCertificate()
-	if attErr != nil || attCert == nil {
-		return toCStatus(err(codeUnknownPolicy, "attestation cert unavailable"))
+
+	// get attestation certificate
+	attestationCertificate, attestationErr := yubiKey.AttestationCertificate()
+	if attestationErr != nil || attestationCertificate == nil {
+		return err(codeUnknownPolicy, "attestation cert unavailable")
 	}
-	slotCert, slotErr := token.Attest(pivlib.SlotSignature)
-	if slotErr != nil || slotCert == nil {
-		return toCStatus(err(codeUnknownPolicy, "slot attestation unavailable"))
+
+	// get slot attestation certificate
+	slotCertificate, slotErr := yubiKey.Attest(pivlib.SlotSignature)
+	if slotErr != nil || slotCertificate == nil {
+		return err(codeUnknownPolicy, "slot attestation unavailable")
 	}
-	att, verifyErr := pivlib.Verify(attCert, slotCert)
+
+	// verify attestation certificate
+	attestation, verifyErr := pivlib.Verify(attestationCertificate, slotCertificate)
 	if verifyErr != nil {
-		return toCStatus(err(codeUnknownPolicy, "attestation verify failed"))
+		return err(codeUnknownPolicy, "attestation verify failed")
 	}
-	// Map to int32 values per header doc
-	switch att.PINPolicy {
+
+	switch attestation.PINPolicy {
 	case pivlib.PINPolicyNever:
-		*pinPolicy = 0
+		*outPinPolicy = 0
 	case pivlib.PINPolicyOnce:
-		*pinPolicy = 1
+		*outPinPolicy = 1
 	case pivlib.PINPolicyAlways:
-		*pinPolicy = 2
+		*outPinPolicy = 2
 	default:
-		return toCStatus(err(codeUnknownPolicy, "unknown pin policy"))
+		return err(codeUnknownPolicy, "unknown pin policy")
 	}
-	switch att.TouchPolicy {
+	switch attestation.TouchPolicy {
 	case pivlib.TouchPolicyNever:
-		*touchPolicy = 0
+		*outTouchPolicy = 0
 	case pivlib.TouchPolicyAlways:
-		*touchPolicy = 1
+		*outTouchPolicy = 1
 	case pivlib.TouchPolicyCached:
-		*touchPolicy = 2
+		*outTouchPolicy = 2
 	default:
-		return toCStatus(err(codeUnknownPolicy, "unknown touch policy"))
+		return err(codeUnknownPolicy, "unknown touch policy")
 	}
-	return toCStatus(ok())
+	return ok()
+}
+
+//export go_piv_bindings_verify_signature_es256
+func go_piv_bindings_verify_signature_es256(
+	publicKey9cPem *C.char,
+	challengeBase64url *C.char,
+	signatureDerBase64url *C.char,
+) C.go_piv_bindings_status_t {
+	if publicKey9cPem == nil || C.GoString(publicKey9cPem) == "" {
+		return err(codeInvalidInput, "empty public key")
+	}
+	if challengeBase64url == nil || C.GoString(challengeBase64url) == "" {
+		return err(codeInvalidInput, "empty challenge")
+	}
+	if signatureDerBase64url == nil || C.GoString(signatureDerBase64url) == "" {
+		return err(codeInvalidInput, "empty signature")
+	}
+
+	// parse public key (PEM SPKI)
+	pemBlock, _ := pem.Decode([]byte(C.GoString(publicKey9cPem)))
+	if pemBlock == nil || pemBlock.Type != "PUBLIC KEY" {
+		return err(codeInvalidInput, "invalid public key pem")
+	}
+	publicKeyAny, parseErr := x509.ParsePKIXPublicKey(pemBlock.Bytes)
+	if parseErr != nil {
+		return err(codeInvalidInput, "invalid public key spki")
+	}
+	ecdsaPublicKey, isEcdsa := publicKeyAny.(*ecdsa.PublicKey)
+	if !isEcdsa || ecdsaPublicKey.Curve == nil {
+		return err(codeInvalidInput, "public key is not ecdsa p-256")
+	}
+
+	// decode inputs
+	challengeString := C.GoString(challengeBase64url)
+	challengeBytes, challengeDecodeErr := base64.RawURLEncoding.DecodeString(challengeString)
+	if challengeDecodeErr != nil {
+		return err(codeInvalidInput, "invalid base64url challenge")
+	}
+	signatureString := C.GoString(signatureDerBase64url)
+	signatureDer, signatureDecodeErr := base64.RawURLEncoding.DecodeString(signatureString)
+	if signatureDecodeErr != nil {
+		return err(codeInvalidInput, "invalid base64url signature")
+	}
+
+	// hash and verify (DER signature)
+	digest := sha256.Sum256(challengeBytes)
+	if isValid := ecdsa.VerifyASN1(ecdsaPublicKey, digest[:], signatureDer); !isValid {
+		return err(codeTransient, "signature verification failed")
+	}
+	return ok()
 }
 
 //export go_piv_bindings_free_string
-func go_piv_bindings_free_string(s *C.char) {
-	if s != nil {
-		C.free(unsafe.Pointer(s))
+func go_piv_bindings_free_string(string *C.char) {
+	if string != nil {
+		C.free(unsafe.Pointer(string))
 	}
 }
 
 //export go_piv_bindings_free_string_array
 func go_piv_bindings_free_string_array(
-	arr **C.char,
-	n C.int32_t,
+	array **C.char,
+	length C.int32_t,
 ) {
-	if arr == nil {
+	if array == nil {
 		return
 	}
-	slice := unsafe.Slice(arr, int(n))
+	slice := unsafe.Slice(array, int(length))
 	for _, p := range slice {
 		if p != nil {
 			C.free(unsafe.Pointer(p))
 		}
 	}
-	C.free(unsafe.Pointer(arr))
-}
-
-func main() {}
-
-//export go_piv_bindings_verify_signature_es256
-func go_piv_bindings_verify_signature_es256(
-	pkPem *C.char,
-	challengeB64 *C.char,
-	signatureDerB64 *C.char,
-) C.go_piv_bindings_status_t {
-	if pkPem == nil || C.GoString(pkPem) == "" {
-		return toCStatus(err(codeTransient, "empty public key"))
-	}
-	if challengeB64 == nil || C.GoString(challengeB64) == "" {
-		return toCStatus(err(codeTransient, "empty challenge"))
-	}
-	if signatureDerB64 == nil || C.GoString(signatureDerB64) == "" {
-		return toCStatus(err(codeTransient, "empty signature"))
-	}
-
-	// Parse public key (PEM SPKI)
-	pemBlock, _ := pem.Decode([]byte(C.GoString(pkPem)))
-	if pemBlock == nil || pemBlock.Type != "PUBLIC KEY" {
-		return toCStatus(err(codeTransient, "invalid public key pem"))
-	}
-	pubAny, perr := x509.ParsePKIXPublicKey(pemBlock.Bytes)
-	if perr != nil {
-		return toCStatus(err(codeTransient, "invalid public key spki"))
-	}
-	ecPub, parsed := pubAny.(*ecdsa.PublicKey)
-	if !parsed || ecPub.Curve == nil {
-		return toCStatus(err(codeTransient, "public key is not ecdsa p-256"))
-	}
-
-	// Decode inputs
-	challStr := C.GoString(challengeB64)
-	challBytes, decErr := base64.RawURLEncoding.DecodeString(challStr)
-	if decErr != nil {
-		return toCStatus(err(codeTransient, "invalid base64url challenge"))
-	}
-	sigStr := C.GoString(signatureDerB64)
-	sigDer, sigDecErr := base64.RawURLEncoding.DecodeString(sigStr)
-	if sigDecErr != nil {
-		return toCStatus(err(codeTransient, "invalid base64url signature"))
-	}
-
-	// Hash and verify (DER signature)
-	digest := sha256.Sum256(challBytes)
-	if valid := ecdsa.VerifyASN1(ecPub, digest[:], sigDer); !valid {
-		return toCStatus(err(codeTransient, "signature verification failed"))
-	}
-	return toCStatus(ok())
+	C.free(unsafe.Pointer(array))
 }

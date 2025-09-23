@@ -7,12 +7,12 @@ import 'dart:math';
 
 import 'package:ffi/ffi.dart' as pkgffi;
 
-// C struct: typedef struct { int32_t code; const char* msg; } go_piv_bindings_status_t;
+// C struct: typedef struct { int32_t code; const char* message; } go_piv_bindings_status_t;
 final class GoPivStatus extends ffi.Struct {
   @ffi.Int32()
   external int code;
 
-  external ffi.Pointer<pkgffi.Utf8> msg;
+  external ffi.Pointer<pkgffi.Utf8> message;
 }
 
 typedef _DeviceOpenNative =
@@ -26,18 +26,18 @@ typedef _DeviceCloseDart = GoPivStatus Function(int handle);
 typedef _PivStatusNative =
     GoPivStatus Function(
       ffi.Int64 handle,
-      ffi.Pointer<ffi.Int32> has9c,
-      ffi.Pointer<ffi.Int32> has9d,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> pk9cPem,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> pk9dPem,
+      ffi.Pointer<ffi.Int32> outHas9c,
+      ffi.Pointer<ffi.Int32> outHas9d,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPk9cPem,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPk9dPem,
     );
 typedef _PivStatusDart =
     GoPivStatus Function(
       int handle,
-      ffi.Pointer<ffi.Int32> has9c,
-      ffi.Pointer<ffi.Int32> has9d,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> pk9cPem,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> pk9dPem,
+      ffi.Pointer<ffi.Int32> outHas9c,
+      ffi.Pointer<ffi.Int32> outHas9d,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPk9cPem,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPk9dPem,
     );
 
 typedef _FreeStringNative = ffi.Void Function(ffi.Pointer<ffi.Char> s);
@@ -52,30 +52,30 @@ typedef _DeviceAuthDart =
 typedef _SignNative =
     GoPivStatus Function(
       ffi.Int64 handle,
-      ffi.Pointer<pkgffi.Utf8> challengeB64,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> signatureB64,
-      ffi.Pointer<pkgffi.Utf8> pinUtf8Nullable,
+      ffi.Pointer<pkgffi.Utf8> challengeBase64url,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outSignatureBase64url,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
     );
 typedef _SignDart =
     GoPivStatus Function(
       int handle,
-      ffi.Pointer<pkgffi.Utf8> challengeB64,
-      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> signatureB64,
-      ffi.Pointer<pkgffi.Utf8> pinUtf8Nullable,
+      ffi.Pointer<pkgffi.Utf8> challengeBase64url,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outSignatureBase64url,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
     );
 
 // verify_signature_es256
 typedef _VerifyNative =
     GoPivStatus Function(
-      ffi.Pointer<pkgffi.Utf8> pk9cPem,
-      ffi.Pointer<pkgffi.Utf8> challengeB64,
-      ffi.Pointer<pkgffi.Utf8> signatureDerB64,
+      ffi.Pointer<pkgffi.Utf8> publicKey9cPem,
+      ffi.Pointer<pkgffi.Utf8> challengeBase64url,
+      ffi.Pointer<pkgffi.Utf8> signatureDerBase64url,
     );
 typedef _VerifyDart =
     GoPivStatus Function(
-      ffi.Pointer<pkgffi.Utf8> pk9cPem,
-      ffi.Pointer<pkgffi.Utf8> challengeB64,
-      ffi.Pointer<pkgffi.Utf8> signatureDerB64,
+      ffi.Pointer<pkgffi.Utf8> publicKey9cPem,
+      ffi.Pointer<pkgffi.Utf8> challengeBase64url,
+      ffi.Pointer<pkgffi.Utf8> signatureDerBase64url,
     );
 
 void main() {
@@ -129,9 +129,9 @@ void main() {
   try {
     final stOpen = deviceOpen(outHandle);
     if (stOpen.code != 0) {
-      final msg = stOpen.msg == ffi.Pointer.fromAddress(0)
+      final msg = stOpen.message == ffi.Pointer.fromAddress(0)
           ? ''
-          : stOpen.msg.toDartString();
+          : stOpen.message.toDartString();
       print('device_open failed: code=${stOpen.code} msg=$msg');
       return;
     }
@@ -146,9 +146,9 @@ void main() {
     try {
       final stAuth = deviceAuth(handle, pinPtr.cast());
       if (stAuth.code != 0) {
-        final msg = stAuth.msg == ffi.Pointer.fromAddress(0)
+        final msg = stAuth.message == ffi.Pointer.fromAddress(0)
             ? ''
-            : stAuth.msg.toDartString();
+            : stAuth.message.toDartString();
         print('device_authenticate: code=${stAuth.code} msg=$msg');
       } else {
         print('device_authenticate OK');
@@ -165,9 +165,9 @@ void main() {
     try {
       final st = pivStatus(handle, has9c, has9d, pk9cPtr, pk9dPtr);
       if (st.code != 0) {
-        final msg = st.msg == ffi.Pointer.fromAddress(0)
+        final msg = st.message == ffi.Pointer.fromAddress(0)
             ? ''
-            : st.msg.toDartString();
+            : st.message.toDartString();
         print('piv_status failed: code=${st.code} msg=$msg');
         return;
       }
@@ -208,9 +208,9 @@ void main() {
         touchPolicyVal = touchPolicyOut.value;
         print('9c policies: pin=$pinPolicyVal touch=$touchPolicyVal');
       } else {
-        final msg = stPol.msg == ffi.Pointer.fromAddress(0)
+        final msg = stPol.message == ffi.Pointer.fromAddress(0)
             ? ''
-            : stPol.msg.toDartString();
+            : stPol.message.toDartString();
         print('slot9c_policy failed: code=${stPol.code} msg=$msg');
       }
     } finally {
@@ -239,9 +239,9 @@ void main() {
           pinForSign,
         );
         if (stSign.code != 0) {
-          final msg = stSign.msg == ffi.Pointer.fromAddress(0)
+          final msg = stSign.message == ffi.Pointer.fromAddress(0)
               ? ''
-              : stSign.msg.toDartString();
+              : stSign.message.toDartString();
           print('sign_challenge failed: code=${stSign.code} msg=$msg');
         } else {
           final sigPtr = sigOutPtr.value;
@@ -275,9 +275,9 @@ void main() {
       final sigPtr = sigB64Str.toNativeUtf8();
       try {
         final stV = verifyEs256(pkPtr, challPtr, sigPtr);
-        final msg = stV.msg == ffi.Pointer.fromAddress(0)
+        final msg = stV.message == ffi.Pointer.fromAddress(0)
             ? ''
-            : stV.msg.toDartString();
+            : stV.message.toDartString();
         if (stV.code == 0) {
           print('verify_signature_es256 OK (piv_status pk)');
         } else {
@@ -294,9 +294,9 @@ void main() {
 
     final stClose = deviceClose(handle);
     if (stClose.code != 0) {
-      final msg = stClose.msg == ffi.Pointer.fromAddress(0)
+      final msg = stClose.message == ffi.Pointer.fromAddress(0)
           ? ''
-          : stClose.msg.toDartString();
+          : stClose.message.toDartString();
       print('device_close failed: code=${stClose.code} msg=$msg');
     } else {
       print('device_close OK');

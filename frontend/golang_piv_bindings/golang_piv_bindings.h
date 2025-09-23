@@ -20,11 +20,11 @@ typedef int64_t go_piv_bindings_handle_t;
 
 // Unified status code for all calls.
 // code: 0 = OK; non-zero values are error codes.
-// msg: optional human-readable message allocated by the library; must be freed
-//      by the caller with go_piv_bindings_free_string when non-null.
+// message: optional human-readable message allocated by the library; must be freed
+//          by the caller with go_piv_bindings_free_string when non-null.
 typedef struct {
   int32_t code;
-  const char* msg;
+  const char* message;
 } go_piv_bindings_status_t;
 
 // Status codes (go_piv_bindings_status_t.code)
@@ -33,99 +33,113 @@ typedef struct {
 // 2  = TRANSIENT       (temporary/IO/format error)
 // 3  = INVALID_HANDLE  (session/handle not found)
 // 4  = PIN_REQUIRED    (PIN missing/invalid)
+// 5  = INVALID_INPUT   (invalid input/format)
 // 6  = SLOT_EMPTY      (key/cert absent in slot)
 // 7  = UNKNOWN_POLICY  (cannot determine slot policies)
+// 8  = INTERNAL_ERROR  (internal processing error)
 
 // Open the first available PIV device (or a device selected internally).
 // On success, out_handle receives a valid non-zero handle.
-go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_handle_t* out_handle);
+go_piv_bindings_status_t go_piv_bindings_device_open(
+  go_piv_bindings_handle_t* out_handle
+);
 
 // Close a previously opened device/session and release resources.
-go_piv_bindings_status_t go_piv_bindings_device_close(go_piv_bindings_handle_t handle);
+go_piv_bindings_status_t go_piv_bindings_device_close(
+  go_piv_bindings_handle_t handle
+);
 
 // Helper to verify the PIV PIN once per session (allows YubiKey to cache PIN if policy permits).
 // pin_utf8: null-terminated UTF-8 string; never persisted or logged by the implementation.
 // Can be called at startup so subsequent operations do not require passing the PIN explicitly
 // when the slot's PIN policy is Once. For Always policy, pass the PIN to operations directly.
-go_piv_bindings_status_t go_piv_bindings_device_authenticate(go_piv_bindings_handle_t handle, const char* pin_utf8);
+go_piv_bindings_status_t go_piv_bindings_device_authenticate(
+  go_piv_bindings_handle_t handle,
+  const char* pin_utf8
+);
 
 // Query presence of keys in slots 9c and 9d and retrieve their public keys when present.
-// has_9c / has_9d: 0 or 1.
-// pk_9c_pem / pk_9d_pem: out-parameters for PEM-encoded SPKI public keys (null-terminated C-strings).
+// out_has_9c / out_has_9d: 0 or 1.
+// out_pk_9c_pem / out_pk_9d_pem: out-parameters for PEM-encoded SPKI public keys (null-terminated C-strings).
 // When non-null on success, the library allocates each string; the caller MUST free them using
 // go_piv_bindings_free_string to avoid memory leaks.
 go_piv_bindings_status_t go_piv_bindings_piv_status(
   go_piv_bindings_handle_t handle,
-  int32_t* has_9c,
-  int32_t* has_9d,
-  const char** pk_9c_pem,
-  const char** pk_9d_pem
+  int32_t* out_has_9c,
+  int32_t* out_has_9d,
+  const char** out_pk_9c_pem,
+  const char** out_pk_9d_pem
 );
 
 
 // Verify ES256 signature over SHA-256(challenge) using 9c public key supplied in PEM SPKI format.
 // Inputs are base64url (no padding) for challenge and for signature (DER-encoded ECDSA signature in base64url).
 go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(
-  const char* pk_9c_pem,
-  const char* challenge_b64url,
-  const char* signature_der_b64url
+  const char* public_key_9c_pem,
+  const char* challenge_base64url,
+  const char* signature_der_base64url
 );
 
 // Sign an arbitrary challenge using slot 9c with ES256 (ECDSA P-256 + SHA-256).
 // Inputs/outputs are base64url (no '=' padding).
-// challenge_b64url: raw challenge bytes encoded as base64url.
-// signature_b64url: DER-encoded ECDSA signature encoded as base64url; must be freed.
-// pin_utf8_nullable: optional UTF-8 PIN; pass NULL when not needed (e.g., PINPolicyNever/Once after authenticate).
+// challenge_base64url: raw challenge bytes encoded as base64url.
+// out_signature_der_base64url: DER-encoded ECDSA signature encoded as base64url; must be freed.
+// pin_utf8_or_null: optional UTF-8 PIN; pass NULL when not needed (e.g., PINPolicyNever/Once after authenticate).
 go_piv_bindings_status_t go_piv_bindings_sign_challenge(
   go_piv_bindings_handle_t handle,
-  const char* challenge_b64url,
-  const char** signature_b64url,
-  const char* pin_utf8_nullable
+  const char* challenge_base64url,
+  const char** out_signature_der_base64url,
+  const char* pin_utf8_or_null
 );
 
-// Generate an ephemeral AES-256 key and return one wrapped enc_aes per recipient using RSA-OAEP-256.
-// recipients_pk_9d_pem: array of recipient 9d public keys (PEM SPKI), length recipients_len.
-// enc_keys_b64url: array of base64url ciphertexts; caller must free via go_piv_bindings_free_string_array.
+// Generate an ephemeral AES-256 key and return one wrapped encrypted_aes per recipient using RSA-OAEP-256.
+// recipients_pk_9d_pem: array of recipient 9d public keys (PEM SPKI), length recipients_count.
+// out_encrypted_keys_base64url: array of base64url ciphertexts; caller must free via go_piv_bindings_free_string_array.
 go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(
   const char** recipients_pk_9d_pem,
-  int32_t recipients_len,
-  const char*** enc_keys_b64url,
-  int32_t* enc_keys_len
+  int32_t recipients_count,
+  const char*** out_encrypted_keys_base64url,
+  int32_t* out_encrypted_keys_count
 );
 
-// Encrypt a message using enc_aes (base64url). Optional AAD is also base64url.
-// Returns a compact JSON envelope with fields enc="A256GCM", iv, ct, tag (all base64url); caller must free.
+// Encrypt a message using encrypted_aes (base64url). Optional AAD is also base64url.
+// Returns a compact JSON envelope with fields encrypted="A256GCM", iv, ciphertext, tag (all base64url); caller must free.
 go_piv_bindings_status_t go_piv_bindings_encrypt_message(
   go_piv_bindings_handle_t handle,
-  const char* enc_aes_b64url,
-  const char* plaintext_b64url,
-  const char* aad_b64url,
-  const char** envelope_json
+  const char* encrypted_aes_base64url,
+  const char* plaintext_base64url,
+  const char* aad_base64url,
+  const char** out_encrypted_envelope_json
 );
 
-// Decrypt a JSON envelope using enc_aes (base64url). Returns plaintext in base64url; caller must free.
+// Decrypt a JSON envelope using encrypted_aes (base64url). Returns plaintext in base64url; caller must free.
 go_piv_bindings_status_t go_piv_bindings_decrypt_message(
   go_piv_bindings_handle_t handle,
-  const char* enc_aes_b64url,
+  const char* encrypted_aes_base64url,
   const char* envelope_json,
-  const char** plaintext_b64url
+  const char** out_plaintext_base64url
 );
 
 // Query slot 9c policies. Returns numeric policies:
-// pin_policy  : 0=Never, 1=Once, 2=Always
-// touch_policy: 0=Never, 1=Always, 2=Cached
+// out_pin_policy  : 0=Never, 1=Once, 2=Always
+// out_touch_policy: 0=Never, 1=Always, 2=Cached
 // If policies cannot be determined (e.g., attestation unsupported), returns status.code=7 (unknown policy).
 go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(
   go_piv_bindings_handle_t handle,
-  int32_t* pin_policy,
-  int32_t* touch_policy
+  int32_t* out_pin_policy,
+  int32_t* out_touch_policy
 );
 
 // Free a single string previously allocated and returned by the library.
-void go_piv_bindings_free_string(const char* s);
+void go_piv_bindings_free_string(
+  const char* string
+);
 
 // Free an array of strings previously allocated and returned by the library.
-void go_piv_bindings_free_string_array(const char** arr, int32_t len);
+void go_piv_bindings_free_string_array(
+  const char** array,
+  int32_t length
+);
 
 #ifdef __cplusplus
 }

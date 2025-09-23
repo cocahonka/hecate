@@ -22,13 +22,12 @@ extern const char *_GoStringPtr(_GoString_ s);
 
 
 #line 3 "go_piv_bindings.go"
-
  #include <stdlib.h>
  #include <stdint.h>
  typedef int64_t go_piv_bindings_handle_t;
  typedef struct {
    int32_t code;
-   const char* msg;
+   const char* message;
  } go_piv_bindings_status_t;
 
 #line 1 "cgo-generated-wrapper"
@@ -93,18 +92,18 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_handle_t* out);
+extern go_piv_bindings_status_t go_piv_bindings_device_open(go_piv_bindings_handle_t* outHandle);
 extern go_piv_bindings_status_t go_piv_bindings_device_close(go_piv_bindings_handle_t handle);
-extern go_piv_bindings_status_t go_piv_bindings_device_authenticate(go_piv_bindings_handle_t handle, char* pin);
-extern go_piv_bindings_status_t go_piv_bindings_piv_status(go_piv_bindings_handle_t handle, int32_t* has9c, int32_t* has9d, char** pk9c, char** pk9d);
-extern go_piv_bindings_status_t go_piv_bindings_sign_challenge(go_piv_bindings_handle_t handle, char* challenge, char** sig, char* pinOpt);
-extern go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(char** recipients, int32_t n, char*** encKeys, int32_t* encN);
-extern go_piv_bindings_status_t go_piv_bindings_encrypt_message(go_piv_bindings_handle_t handle, char* encAES, char* pt, char* aad, char** envelope);
-extern go_piv_bindings_status_t go_piv_bindings_decrypt_message(go_piv_bindings_handle_t handle, char* encAES, char* envelope, char** pt);
-extern go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(go_piv_bindings_handle_t handle, int32_t* pinPolicy, int32_t* touchPolicy);
-extern void go_piv_bindings_free_string(char* s);
-extern void go_piv_bindings_free_string_array(char** arr, int32_t n);
-extern go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(char* pkPem, char* challengeB64, char* signatureDerB64);
+extern go_piv_bindings_status_t go_piv_bindings_device_authenticate(go_piv_bindings_handle_t handle, char* pinUtf8);
+extern go_piv_bindings_status_t go_piv_bindings_piv_status(go_piv_bindings_handle_t handle, int32_t* outHas9c, int32_t* outHas9d, char** outPk9c, char** outPk9d);
+extern go_piv_bindings_status_t go_piv_bindings_sign_challenge(go_piv_bindings_handle_t handle, char* challengeBase64url, char** outSignatureDerBase64url, char* pinUtf8OrNull);
+extern go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(char** recipientsPk9dPem, int32_t recipientsCount, char*** outEncryptedKeysBase64url, int32_t* outEncryptedKeysCount);
+extern go_piv_bindings_status_t go_piv_bindings_encrypt_message(go_piv_bindings_handle_t handle, char* encryptedAesBase64url, char* plaintextBase64url, char* aadBase64url, char** outEncryptedEnvelopeJson);
+extern go_piv_bindings_status_t go_piv_bindings_decrypt_message(go_piv_bindings_handle_t handle, char* encryptedAesBase64url, char* envelopeJson, char** outPlaintextBase64url);
+extern go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(go_piv_bindings_handle_t handle, int32_t* outPinPolicy, int32_t* outTouchPolicy);
+extern go_piv_bindings_status_t go_piv_bindings_verify_signature_es256(char* publicKey9cPem, char* challengeBase64url, char* signatureDerBase64url);
+extern void go_piv_bindings_free_string(char* string);
+extern void go_piv_bindings_free_string_array(char** array, int32_t length);
 
 #ifdef __cplusplus
 }
