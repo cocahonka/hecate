@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
-	"github.com/twinj/uuid"
 	"go.uber.org/zap"
 )
 
@@ -58,5 +59,7 @@ func (u *Register) Init(ctx context.Context, nickname string) (string, error) {
 }
 
 func generateChallenge() string {
-	return uuid.NewV4().String()
+	challenge := make([]byte, 32)
+	rand.Read(challenge)
+	return base64.RawURLEncoding.EncodeToString(challenge)
 }
