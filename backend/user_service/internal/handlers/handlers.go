@@ -24,6 +24,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 	routes := gin.Default()
 	{
 		routes.POST("/register/init", h.Init)
+		routes.POST("/register/verify", h.Verify)
 	}
 
 	routes.GET("/ping", func(c *gin.Context) {

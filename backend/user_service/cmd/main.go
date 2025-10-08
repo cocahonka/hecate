@@ -66,7 +66,7 @@ func main() {
 	cacheRepo := repository.NewCacheRepository(rClient)
 	userRepo := repository.NewUserRepository(pConn)
 
-	RegisterService := service.NewRegisterService(logger, userRepo, cacheRepo, cfg.ChallengeTTL)
+	RegisterService := service.NewRegisterService(logger, userRepo, cacheRepo, userRepo, cfg.ChallengeTTL)
 
 	//Создание HTTP сервера
 	handlers := handler.NewHandler(RegisterService)
