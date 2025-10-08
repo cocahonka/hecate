@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,4 +22,23 @@ func NewCacheRepository(client *redis.Client) *Cache {
 
 func (r *Cache) Save(ctx context.Context, nickname, challenge string, ttl time.Duration) error {
 	return r.client.Set(ctx, fmt.Sprintf("%s:%s", domain.CacheKeyPrefix, nickname), challenge, ttl).Err()
+}
+
+func (r *Cache) Load(ctx context.Context, nickname string) (string, error) {
+	val, err := r.client.Get(ctx, fmt.Sprintf("%s:%s", domain.CacheKeyPrefix, nickname)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", domain.ErrChallengeNotFound
+		}
+		return "", err
+	}
+	return val, nil
+}
+
+func (r *Cache) Delete(ctx context.Context, nickname string) error {
+	_, err := r.client.Del(ctx, fmt.Sprintf("%s:%s", domain.CacheKeyPrefix, nickname)).Result()
+	if err != nil {
+		return err
+	}
+	return nil
 }
