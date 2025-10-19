@@ -8,6 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var userServicePrefix = "/user"
+
 type Handler struct {
 	register *service.Register
 }
@@ -21,7 +23,8 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	routes := gin.Default()
+	engine := gin.Default()
+	routes := engine.Group(userServicePrefix)
 	{
 		routes.POST("/register/init", h.Init)
 		routes.POST("/register/verify", h.Verify)
@@ -32,5 +35,5 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 			"message": "pong",
 		})
 	})
-	return routes
+	return engine
 }
