@@ -15,6 +15,116 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/login/init": {
+            "post": {
+                "description": "Initiate the login process by providing a nickname and receiving a challenge",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Login"
+                ],
+                "summary": "Initialize user login",
+                "parameters": [
+                    {
+                        "description": "Login initialization request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.InitLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Challenge for login",
+                        "schema": {
+                            "$ref": "#/definitions/handler.InitLoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Nickname not found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/login/verify": {
+            "post": {
+                "description": "Verify the signed challenge to complete the login process and receive JWT tokens.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Login"
+                ],
+                "summary": "Verify user login",
+                "parameters": [
+                    {
+                        "description": "Login verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Access and refresh tokens",
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyLoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Nickname not found or challenge expired",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/register/init": {
             "post": {
                 "description": "Initiate the registration process by providing a nickname and receiving a challenge",
@@ -66,6 +176,64 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/register/verify": {
+            "post": {
+                "description": "Verify the signed challenge and complete the registration process",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Registration"
+                ],
+                "summary": "Verify user registration",
+                "parameters": [
+                    {
+                        "description": "Registration verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Registration completed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyRegisterResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Challenge not found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -77,6 +245,27 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.InitLoginRequest": {
+            "type": "object",
+            "required": [
+                "nickname"
+            ],
+            "properties": {
+                "nickname": {
+                    "type": "string",
+                    "maxLength": 30,
+                    "minLength": 3
+                }
+            }
+        },
+        "handler.InitLoginResponse": {
+            "type": "object",
+            "properties": {
+                "challenge": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.InitRegisterRequest": {
             "type": "object",
             "required": [
@@ -84,7 +273,9 @@ const docTemplate = `{
             ],
             "properties": {
                 "nickname": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 30,
+                    "minLength": 3
                 }
             }
         },
@@ -93,6 +284,65 @@ const docTemplate = `{
             "properties": {
                 "challenge": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.VerifyLoginRequest": {
+            "type": "object",
+            "required": [
+                "nickname",
+                "signature"
+            ],
+            "properties": {
+                "nickname": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyLoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyRegisterRequest": {
+            "type": "object",
+            "required": [
+                "nickname",
+                "pub9c",
+                "pub9d",
+                "signed_challenge"
+            ],
+            "properties": {
+                "nickname": {
+                    "type": "string",
+                    "maxLength": 30,
+                    "minLength": 3
+                },
+                "pub9c": {
+                    "type": "string"
+                },
+                "pub9d": {
+                    "type": "string"
+                },
+                "signed_challenge": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyRegisterResponse": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
                 }
             }
         }

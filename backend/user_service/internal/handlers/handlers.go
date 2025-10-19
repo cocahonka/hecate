@@ -4,18 +4,21 @@ import (
 	"net/http"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
-	"github.com/cocahonka/hecate/backend/user_service/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 var userServicePrefix = "/user"
 
 type Handler struct {
-	register *service.Register
+	register RegisterManager
+	login    LoginManager
 }
 
-func NewHandler(register *service.Register) *Handler {
-	return &Handler{register: register}
+func NewHandler(register RegisterManager, login LoginManager) *Handler {
+	return &Handler{
+		register: register,
+		login:    login,
+	}
 }
 
 func (h *Handler) InitRoutes(env string) http.Handler {
@@ -28,6 +31,8 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 	{
 		routes.POST("/register/init", h.Init)
 		routes.POST("/register/verify", h.Verify)
+		routes.POST("/login/init", h.InitLogin)
+		routes.POST("/login/verify", h.VerifyLogin)
 	}
 
 	routes.GET("/ping", func(c *gin.Context) {

@@ -12,9 +12,16 @@ var ErrUnknownEnv = errors.New("unknown enviroment")
 type Config struct {
 	Database     DatabaseConfig
 	Cache        CacheConfig
+	JWT          JWTConfig
 	Env          string        `env:"ENV" env-default:"production"`
 	ChallengeTTL time.Duration `env:"CHALLENGE_TTL" env-default:"3m"` // in seconds
 	ServerPort   string        `env:"SERVER_PORT" env-default:"8080"`
+}
+
+type JWTConfig struct {
+	Secret          string        `env:"JWT_SECRET" env-required:"true"`
+	AccessTokenTTL  time.Duration `env:"ACCESS_TOKEN_TTL" env-default:"15m"`
+	RefreshTokenTTL time.Duration `env:"REFRESH_TOKEN_TTL" env-default:"24h"`
 }
 type DatabaseConfig struct {
 	Port     string `env:"DB_PORT"`

@@ -92,7 +92,7 @@ func generateKeyPairAndSignature(t *testing.T, challenge string) (pubKeyPEM, sig
 // generateInvalidSignatureForKey generates an invalid signature for a given key
 func generateInvalidSignatureForKey(t *testing.T, challenge string) string {
 	t.Helper()
-	
+
 	// Generate a different key and sign with it
 	_, wrongSig, _ := generateKeyPairAndSignature(t, challenge)
 	return wrongSig
@@ -101,10 +101,21 @@ func generateInvalidSignatureForKey(t *testing.T, challenge string) string {
 // setupTestMocks creates mock objects for testing
 func setupTestMocks(t *testing.T) (*mocks.MocknicknameChecker, *mocks.MockchallengeManager, *mocks.MockUserSaver) {
 	t.Helper()
-	
+
 	mockChecker := mocks.NewMocknicknameChecker(t)
 	mockManager := mocks.NewMockchallengeManager(t)
 	mockUserSaver := mocks.NewMockUserSaver(t)
-	
+
 	return mockChecker, mockManager, mockUserSaver
+}
+
+// setupTestMocksForRegister creates mock objects for register service testing
+func setupTestMocksForRegister(t *testing.T) (*mocks.MockUserProvider, *mocks.MockchallengeManager, *mocks.MockUserSaver) {
+	t.Helper()
+
+	mockUserProvider := mocks.NewMockUserProvider(t)
+	mockManager := mocks.NewMockchallengeManager(t)
+	mockUserSaver := mocks.NewMockUserSaver(t)
+
+	return mockUserProvider, mockManager, mockUserSaver
 }
