@@ -3,44 +3,26 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
 	"go.uber.org/zap"
 )
 
-type nicknameChecker interface {
-	// IsExists checks if a nickname already exists in the system.
-	IsExists(ctx context.Context, nickname string) (bool, error)
-}
-
-type challengeManager interface {
-	// Save stores the challenge for a given nickname with a specified TTL.
-	Save(ctx context.Context, nickname, challenge string, ttl time.Duration) error
-	// Load retrieves the challenge associated with the given nickname.
-	Load(ctx context.Context, nickname string) (string, error)
-	// Delete removes the challenge associated with the given nickname.
-	Delete(ctx context.Context, nickname string) error
-}
-
-type UserSaver interface {
-	// Create saves a new user with the provided nickname and public keys.
-	Create(ctx context.Context, nickname, pub9c, pub9d string) error
-}
-
 // Register handles user registration, including nickname validation, challenge generation, and user creation.
 type Register struct {
 	logger           *zap.Logger
-	checker          nicknameChecker
+	userProvider     UserProvider
 	challengeManager challengeManager
 	userSaver        UserSaver
 	challengeTTL     time.Duration
 }
 
-func NewRegisterService(logger *zap.Logger, checker nicknameChecker, manager challengeManager, userSaver UserSaver, challengeTTL time.Duration) *Register {
+func NewRegisterService(logger *zap.Logger, userProvider UserProvider, manager challengeManager, userSaver UserSaver, challengeTTL time.Duration) *Register {
 	return &Register{
 		logger:           logger,
-		checker:          checker,
+		userProvider:     userProvider,
 		challengeManager: manager,
 		userSaver:        userSaver,
 		challengeTTL:     challengeTTL,
@@ -51,14 +33,14 @@ func NewRegisterService(logger *zap.Logger, checker nicknameChecker, manager cha
 func (r *Register) Init(ctx context.Context, nickname string) (string, error) {
 	r.logger.Info("init register", zap.String("nickname", nickname))
 
-	isExists, err := r.checker.IsExists(ctx, nickname)
-	if err != nil {
-		r.logger.Error("failed to check nickname", zap.String("nickname", nickname), zap.Error(err))
-		return "", err
-	}
-	if isExists {
+	_, err := r.userProvider.Get(ctx, nickname)
+	if err == nil {
 		r.logger.Info("nickname is not unique", zap.String("nickname", nickname))
 		return "", domain.ErrNicknameIsNotUnique
+	}
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		r.logger.Error("failed to check nickname", zap.String("nickname", nickname), zap.Error(err))
+		return "", err
 	}
 
 	challenge := generateChallenge()

@@ -21,30 +21,30 @@ const (
 	challengeTTL  = 5 * time.Minute
 )
 
-func setupRegisterService(t *testing.T) (*Register, *mocks.MocknicknameChecker, *mocks.MockchallengeManager, *mocks.MockUserSaver) {
+func setupRegisterService(t *testing.T) (*Register, *mocks.MockUserProvider, *mocks.MockchallengeManager, *mocks.MockUserSaver) {
 	t.Helper()
-	
+
 	logger := zap.NewNop()
-	mockChecker, mockManager, mockUserSaver := setupTestMocks(t)
-	
-	service := NewRegisterService(logger, mockChecker, mockManager, mockUserSaver, challengeTTL)
-	return service, mockChecker, mockManager, mockUserSaver
+	mockUserProvider, mockManager, mockUserSaver := setupTestMocksForRegister(t)
+
+	service := NewRegisterService(logger, mockUserProvider, mockManager, mockUserSaver, challengeTTL)
+	return service, mockUserProvider, mockManager, mockUserSaver
 }
 
 func TestRegister_Init(t *testing.T) {
 	tests := []struct {
 		name     string
 		nickname string
-		setup    func(*mocks.MocknicknameChecker, *mocks.MockchallengeManager)
+		setup    func(*mocks.MockUserProvider, *mocks.MockchallengeManager)
 		wantErr  error
 	}{
 		{
 			name:     "successful registration",
 			nickname: testNickname,
-			setup: func(checker *mocks.MocknicknameChecker, manager *mocks.MockchallengeManager) {
-				checker.EXPECT().
-					IsExists(mock.Anything, testNickname).
-					Return(false, nil).Once()
+			setup: func(userProvider *mocks.MockUserProvider, manager *mocks.MockchallengeManager) {
+				userProvider.EXPECT().
+					Get(mock.Anything, testNickname).
+					Return(nil, domain.ErrUserNotFound).Once()
 				manager.EXPECT().
 					Save(mock.Anything, testNickname, mock.AnythingOfType("string"), challengeTTL).
 					Return(nil).Once()
@@ -54,32 +54,32 @@ func TestRegister_Init(t *testing.T) {
 		{
 			name:     "nickname already exists",
 			nickname: existingUser,
-			setup: func(checker *mocks.MocknicknameChecker, manager *mocks.MockchallengeManager) {
-				checker.EXPECT().
-					IsExists(mock.Anything, existingUser).
-					Return(true, nil).Once()
+			setup: func(userProvider *mocks.MockUserProvider, manager *mocks.MockchallengeManager) {
+				userProvider.EXPECT().
+					Get(mock.Anything, existingUser).
+					Return(&domain.User{}, nil).Once()
 			},
 			wantErr: domain.ErrNicknameIsNotUnique,
 		},
 		{
 			name:     "nickname check error",
 			nickname: testNickname,
-			setup: func(checker *mocks.MocknicknameChecker, manager *mocks.MockchallengeManager) {
+			setup: func(userProvider *mocks.MockUserProvider, manager *mocks.MockchallengeManager) {
 				dbError := errors.New("database connection error")
-				checker.EXPECT().
-					IsExists(mock.Anything, testNickname).
-					Return(false, dbError).Once()
+				userProvider.EXPECT().
+					Get(mock.Anything, testNickname).
+					Return(nil, dbError).Once()
 			},
 			wantErr: errors.New("database connection error"),
 		},
 		{
 			name:     "challenge save error",
 			nickname: testNickname,
-			setup: func(checker *mocks.MocknicknameChecker, manager *mocks.MockchallengeManager) {
+			setup: func(userProvider *mocks.MockUserProvider, manager *mocks.MockchallengeManager) {
 				saveError := errors.New("redis connection error")
-				checker.EXPECT().
-					IsExists(mock.Anything, testNickname).
-					Return(false, nil).Once()
+				userProvider.EXPECT().
+					Get(mock.Anything, testNickname).
+					Return(nil, domain.ErrUserNotFound).Once()
 				manager.EXPECT().
 					Save(mock.Anything, testNickname, mock.AnythingOfType("string"), challengeTTL).
 					Return(saveError).Once()
@@ -89,10 +89,10 @@ func TestRegister_Init(t *testing.T) {
 		{
 			name:     "context cancellation",
 			nickname: testNickname,
-			setup: func(checker *mocks.MocknicknameChecker, manager *mocks.MockchallengeManager) {
-				checker.EXPECT().
-					IsExists(mock.Anything, testNickname).
-					Return(false, context.Canceled).Once()
+			setup: func(userProvider *mocks.MockUserProvider, manager *mocks.MockchallengeManager) {
+				userProvider.EXPECT().
+					Get(mock.Anything, testNickname).
+					Return(nil, context.Canceled).Once()
 			},
 			wantErr: context.Canceled,
 		},
@@ -100,11 +100,11 @@ func TestRegister_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service, mockChecker, mockManager, _ := setupRegisterService(t)
+			service, mockUserProvider, mockManager, _ := setupRegisterService(t)
 
 			// Apply test-specific setup
 			if tt.setup != nil {
-				tt.setup(mockChecker, mockManager)
+				tt.setup(mockUserProvider, mockManager)
 			}
 
 			ctx := context.Background()
@@ -125,7 +125,7 @@ func TestRegister_Init(t *testing.T) {
 				assert.NotEmpty(t, challenge)
 			}
 
-			mockChecker.AssertExpectations(t)
+			mockUserProvider.AssertExpectations(t)
 			mockManager.AssertExpectations(t)
 		})
 	}
@@ -356,7 +356,7 @@ func TestRegister_VerifyAndComplete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service, _, mockManager, mockUserSaver := setupRegisterService(t)
-			
+
 			if tt.setup != nil {
 				tt.setup(mockManager, mockUserSaver)
 			}

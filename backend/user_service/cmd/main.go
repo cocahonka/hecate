@@ -65,11 +65,13 @@ func main() {
 
 	cacheRepo := repository.NewCacheRepository(rClient)
 	userRepo := repository.NewUserRepository(pConn)
+	tokenService := service.NewTokenService(cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL)
 
 	RegisterService := service.NewRegisterService(logger, userRepo, cacheRepo, userRepo, cfg.ChallengeTTL)
+	LoginService := service.NewLoginService(logger, cacheRepo, userRepo, tokenService, cfg.ChallengeTTL)
 
 	//Создание HTTP сервера
-	handlers := handler.NewHandler(RegisterService)
+	handlers := handler.NewHandler(RegisterService, LoginService)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.ServerPort),
 		Handler: handlers.InitRoutes(cfg.Env),

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,19 +18,6 @@ func NewUserRepository(pool *pgxpool.Pool) *User {
 	return &User{
 		pool: pool,
 	}
-}
-
-func (r *User) IsExists(ctx context.Context, nickname string) (bool, error) {
-	var exists bool
-	err := r.pool.QueryRow(
-		ctx,
-		"SELECT EXISTS(SELECT 1 FROM users WHERE nickname=$1)",
-		nickname,
-	).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
 }
 
 func (r *User) Create(ctx context.Context, nickname, pub9c, pub9d string) error {
@@ -45,4 +33,18 @@ func (r *User) Create(ctx context.Context, nickname, pub9c, pub9d string) error 
 		return err
 	}
 	return nil
+}
+
+func (r *User) Get(ctx context.Context, nickname string) (*domain.User, error) {
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx,
+		"SELECT id, nickname, pubkey_auth, pubkey_enc FROM users WHERE nickname=$1",
+		nickname).Scan(&user.ID, &user.Nickname, &user.Pub9c, &user.Pub9d)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return user, nil
 }

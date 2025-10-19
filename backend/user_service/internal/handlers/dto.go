@@ -22,3 +22,21 @@ type VerifyRegisterResponse struct {
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
+
+type InitLoginRequest struct {
+	Nickname string `json:"nickname" binding:"required,min=3,max=30"`
+}
+
+type InitLoginResponse struct {
+	Challenge string `json:"challenge"`
+}
+
+type VerifyLoginRequest struct {
+	Nickname  string `json:"nickname" binding:"required"`
+	Signature string `json:"signature" binding:"required"`
+}
+
+type VerifyLoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}

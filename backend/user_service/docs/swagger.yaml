@@ -5,17 +5,73 @@ definitions:
       error:
         type: string
     type: object
+  handler.InitLoginRequest:
+    properties:
+      nickname:
+        maxLength: 30
+        minLength: 3
+        type: string
+    required:
+    - nickname
+    type: object
+  handler.InitLoginResponse:
+    properties:
+      challenge:
+        type: string
+    type: object
   handler.InitRegisterRequest:
     properties:
       nickname:
+        maxLength: 30
+        minLength: 3
         type: string
     required:
-      - nickname
+    - nickname
     type: object
   handler.InitRegisterResponse:
     properties:
       challenge:
         type: string
+    type: object
+  handler.VerifyLoginRequest:
+    properties:
+      nickname:
+        type: string
+      signature:
+        type: string
+    required:
+    - nickname
+    - signature
+    type: object
+  handler.VerifyLoginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  handler.VerifyRegisterRequest:
+    properties:
+      nickname:
+        maxLength: 30
+        minLength: 3
+        type: string
+      pub9c:
+        type: string
+      pub9d:
+        type: string
+      signed_challenge:
+        type: string
+    required:
+    - nickname
+    - pub9c
+    - pub9d
+    - signed_challenge
+    type: object
+  handler.VerifyRegisterResponse:
+    properties:
+      success:
+        type: boolean
     type: object
 info:
   contact: {}
@@ -23,42 +79,153 @@ info:
   title: User Service API
   version: "1.0"
 paths:
+  /login/init:
+    post:
+      consumes:
+      - application/json
+      description: Initiate the login process by providing a nickname and receiving
+        a challenge
+      parameters:
+      - description: Login initialization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.InitLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Challenge for login
+          schema:
+            $ref: '#/definitions/handler.InitLoginResponse'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Nickname not found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Initialize user login
+      tags:
+      - Login
+  /login/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify the signed challenge to complete the login process and receive
+        JWT tokens.
+      parameters:
+      - description: Login verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VerifyLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Access and refresh tokens
+          schema:
+            $ref: '#/definitions/handler.VerifyLoginResponse'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Invalid signature
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Nickname not found or challenge expired
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Verify user login
+      tags:
+      - Login
   /register/init:
     post:
       consumes:
-        - application/json
-      description:
-        Initiate the registration process by providing a nickname and receiving
+      - application/json
+      description: Initiate the registration process by providing a nickname and receiving
         a challenge
       parameters:
-        - description: Registration initialization request
-          in: body
-          name: request
-          required: true
-          schema:
-            $ref: "#/definitions/handler.InitRegisterRequest"
+      - description: Registration initialization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.InitRegisterRequest'
       produces:
-        - application/json
+      - application/json
       responses:
         "200":
           description: Challenge for registration
           schema:
-            $ref: "#/definitions/handler.InitRegisterResponse"
+            $ref: '#/definitions/handler.InitRegisterResponse'
         "400":
           description: Invalid request format
           schema:
-            $ref: "#/definitions/handler.ErrorResponse"
+            $ref: '#/definitions/handler.ErrorResponse'
         "409":
           description: Nickname is not unique
           schema:
-            $ref: "#/definitions/handler.ErrorResponse"
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: "#/definitions/handler.ErrorResponse"
+            $ref: '#/definitions/handler.ErrorResponse'
       summary: Initialize user registration
       tags:
-        - Registration
+      - Registration
+  /register/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify the signed challenge and complete the registration process
+      parameters:
+      - description: Registration verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VerifyRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Registration completed successfully
+          schema:
+            $ref: '#/definitions/handler.VerifyRegisterResponse'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Invalid signature
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Challenge not found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Verify user registration
+      tags:
+      - Registration
 schemes:
-  - http
+- http
 swagger: "2.0"
