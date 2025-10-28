@@ -83,3 +83,48 @@ func (h *Handler) VerifyLogin(ctx *gin.Context) {
 	})
 }
 
+// RefreshToken validates a refresh token and returns new access and refresh tokens.
+// @Summary Refresh access token
+// @Description Refresh access and refresh tokens using a valid refresh token
+// @Tags Login
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token request"
+// @Success 200 {object} RefreshTokenResponse "New access and refresh tokens"
+// @Failure 400 {object} ErrorResponse "Invalid request format"
+// @Failure 401 {object} ErrorResponse "Invalid or expired refresh token"
+// @Failure 404 {object} ErrorResponse "User not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /login/refresh [post]
+func (h *Handler) RefreshToken(ctx *gin.Context) {
+	var req RefreshTokenRequest
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request"})
+		return
+	}
+
+	accessToken, refreshToken, err := h.login.Refresh(ctx.Request.Context(), req.RefreshToken, req.Nickname)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidRefreshToken) {
+			ctx.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid or expired refresh token"})
+			return
+		}
+		if errors.Is(err, domain.ErrRefreshTokenMismatch) {
+			ctx.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid or expired refresh token"})
+			return
+		}
+		if errors.Is(err, domain.ErrUserNotFound) {
+			ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "user not found"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, RefreshTokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	})
+}
+

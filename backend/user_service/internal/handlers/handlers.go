@@ -33,6 +33,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 		routes.POST("/register/verify", h.Verify)
 		routes.POST("/login/init", h.InitLogin)
 		routes.POST("/login/verify", h.VerifyLogin)
+		routes.POST("/login/refresh", h.RefreshToken)
 	}
 
 	routes.GET("/ping", func(c *gin.Context) {

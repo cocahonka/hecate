@@ -40,3 +40,13 @@ type VerifyLoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
+
+type RefreshTokenRequest struct {
+	RefreshToken string  `json:"refresh_token" binding:"required"`
+	Nickname     *string `json:"nickname,omitempty"`
+}
+
+type RefreshTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}

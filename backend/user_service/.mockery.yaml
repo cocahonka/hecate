@@ -8,10 +8,10 @@ packages:
       all: true
       dir: "{{.InterfaceDir}}/mocks"
       filename: "{{.InterfaceName}}.go"
-      pkgname: "mocks"
+      outpkg: "mocks"
   github.com/cocahonka/hecate/backend/user_service/internal/handlers:
     config:
       all: true
       dir: "{{.InterfaceDir}}/mocks"
       filename: "{{.InterfaceName}}.go"
-      pkgname: "mocks"
+      outpkg: "mocks"

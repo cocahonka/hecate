@@ -14,4 +14,5 @@ type RegisterManager interface {
 type LoginManager interface {
 	Init(ctx context.Context, nickname string) (string, error)
 	Verify(ctx context.Context, nickname, signature string) (accessToken, refreshToken string, err error)
+	Refresh(ctx context.Context, refreshToken string, nickname *string) (accessToken, newRefreshToken string, err error)
 }
