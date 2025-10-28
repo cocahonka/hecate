@@ -48,3 +48,17 @@ func (r *User) Get(ctx context.Context, nickname string) (*domain.User, error) {
 	}
 	return user, nil
 }
+
+func (r *User) GetByID(ctx context.Context, userID string) (*domain.User, error) {
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx,
+		"SELECT id, nickname, pubkey_auth, pubkey_enc FROM users WHERE id=$1",
+		userID).Scan(&user.ID, &user.Nickname, &user.Pub9c, &user.Pub9d)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return user, nil
+}

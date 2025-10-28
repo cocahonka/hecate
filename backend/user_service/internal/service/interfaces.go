@@ -32,3 +32,20 @@ type UserProvider interface {
 type TokenGenerator interface {
 	Generate(user domain.User) (accessToken, refreshToken string, err error)
 }
+
+// TokenValidator defines the interface for validating refresh tokens.
+type TokenValidator interface {
+	ValidateRefreshToken(token string) (userID string, err error)
+}
+
+// RefreshTokenManager defines the interface for managing refresh tokens in cache.
+type RefreshTokenManager interface {
+	SaveRefreshToken(ctx context.Context, userID, refreshToken string, ttl time.Duration) error
+	GetRefreshToken(ctx context.Context, userID string) (string, error)
+	DeleteRefreshToken(ctx context.Context, userID string) error
+}
+
+// UserProviderByID defines the interface for retrieving user data by ID.
+type UserProviderByID interface {
+	GetByID(ctx context.Context, userID string) (*domain.User, error)
+}

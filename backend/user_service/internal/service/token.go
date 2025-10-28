@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
@@ -50,4 +51,34 @@ func (s *TokenService) Generate(user domain.User) (string, string, error) {
 	}
 
 	return accessTokenString, refreshTokenString, nil
+}
+
+// ValidateRefreshToken validates a refresh token and returns the user ID.
+func (s *TokenService) ValidateRefreshToken(token string) (userID string, err error) {
+	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid signing method")
+		}
+		return []byte(s.secret), nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if !parsedToken.Valid {
+		return "", errors.New("invalid token")
+	}
+
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return "", errors.New("invalid user ID in token")
+	}
+
+	return sub, nil
 }

@@ -42,3 +42,23 @@ func (r *Cache) Delete(ctx context.Context, nickname string) error {
 	}
 	return nil
 }
+
+func (r *Cache) SaveRefreshToken(ctx context.Context, userID, refreshToken string, ttl time.Duration) error {
+	return r.client.Set(ctx, fmt.Sprintf("%s:%s", domain.RefreshTokenKeyPrefix, userID), refreshToken, ttl).Err()
+}
+
+func (r *Cache) GetRefreshToken(ctx context.Context, userID string) (string, error) {
+	val, err := r.client.Get(ctx, fmt.Sprintf("%s:%s", domain.RefreshTokenKeyPrefix, userID)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", domain.ErrRefreshTokenNotFound
+		}
+		return "", err
+	}
+	return val, nil
+}
+
+func (r *Cache) DeleteRefreshToken(ctx context.Context, userID string) error {
+	_, err := r.client.Del(ctx, fmt.Sprintf("%s:%s", domain.RefreshTokenKeyPrefix, userID)).Result()
+	return err
+}
