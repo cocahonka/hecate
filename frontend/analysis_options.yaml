@@ -1,1 +1,3 @@
 include: package:coca_lints/analysis_options.yaml
+formatter:
+  trailing_commas: preserve
