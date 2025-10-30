@@ -309,10 +309,7 @@ func go_piv_bindings_wrap_aes_for_recipients(
 	recipientsPk9dPem **C.char,
 	recipientsCount C.int32_t,
 	outEncryptedKeysBase64url ***C.char,
-	outEncryptedKeysCount *C.int32_t,
 ) C.go_piv_bindings_status_t {
-	*outEncryptedKeysCount = 0
-	*outEncryptedKeysBase64url = nil
 	return ok()
 }
 
@@ -321,10 +318,8 @@ func go_piv_bindings_encrypt_message(
 	handle C.go_piv_bindings_handle_t,
 	encryptedAesBase64url *C.char,
 	plaintextBase64url *C.char,
-	aadBase64url *C.char,
 	outEncryptedEnvelopeJson **C.char,
 ) C.go_piv_bindings_status_t {
-	*outEncryptedEnvelopeJson = C.CString("{\"encrypted\":\"A256GCM\",\"iv\":\"\",\"ciphertext\":\"\",\"tag\":\"\"}")
 	return ok()
 }
 
@@ -335,7 +330,6 @@ func go_piv_bindings_decrypt_message(
 	envelopeJson *C.char,
 	outPlaintextBase64url **C.char,
 ) C.go_piv_bindings_status_t {
-	*outPlaintextBase64url = C.CString("")
 	return ok()
 }
 

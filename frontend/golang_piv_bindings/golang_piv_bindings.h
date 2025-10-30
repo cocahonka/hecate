@@ -92,30 +92,35 @@ go_piv_bindings_status_t go_piv_bindings_sign_challenge(
   const char* pin_utf8_or_null
 );
 
-// Generate an ephemeral AES-256 key and return one wrapped encrypted_aes per recipient using RSA-OAEP-256.
-// recipients_pk_9d_pem: array of recipient 9d public keys (PEM SPKI), length recipients_count.
-// out_encrypted_keys_base64url: array of base64url ciphertexts; caller must free via go_piv_bindings_free_string_array.
+// Wrap a freshly generated chat AES key for all recipients (including the initiator if provided).
+// Output: an array of JSON strings (one per recipient), each describing the wrapped key object:
+//   { "ephemeral_public_key_pem": "-----BEGIN PUBLIC KEY-----...", "wrapped_aes": "base64url" }
+// The function does not expose the plaintext AES and clears it from memory after wrapping.
+// The library allocates an array of length equal to recipients_count; the caller must free it with go_piv_bindings_free_string_array.
 go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(
   const char** recipients_pk_9d_pem,
   int32_t recipients_count,
-  const char*** out_encrypted_keys_base64url,
-  int32_t* out_encrypted_keys_count
+  const char*** out_aes_envelope_json
 );
 
-// Encrypt a message using encrypted_aes (base64url). Optional AAD is also base64url.
-// Returns a compact JSON envelope with fields encrypted="A256GCM", iv, ciphertext, tag (all base64url); caller must free.
+// Encrypt a message using the chat AES key recovered from aes_envelope_json.
+// aes_envelope_json: JSON returned by wrap for the current user: { "ephemeral_public_key_pem", "wrapped_aes" }.
+// plaintext_base64url: plaintext in base64url.
+// Output envelope_json: AES-GCM envelope JSON:
+//   { "nonce": "base64url", "ciphertext": "base64url", "tag": "base64url" }
+// The library allocates the string; the caller must free it with go_piv_bindings_free_string.
 go_piv_bindings_status_t go_piv_bindings_encrypt_message(
   go_piv_bindings_handle_t handle,
-  const char* encrypted_aes_base64url,
+  const char* aes_envelope_json,
   const char* plaintext_base64url,
-  const char* aad_base64url,
-  const char** out_encrypted_envelope_json
+  const char** out_message_envelope_json
 );
 
-// Decrypt a JSON envelope using encrypted_aes (base64url). Returns plaintext in base64url; caller must free.
+// Decrypt a message using the chat AES key recovered from aes_envelope_json and the given message envelope JSON.
+// Returns plaintext_base64url. The library allocates the string; the caller must free it with go_piv_bindings_free_string.
 go_piv_bindings_status_t go_piv_bindings_decrypt_message(
   go_piv_bindings_handle_t handle,
-  const char* encrypted_aes_base64url,
+  const char* aes_envelope_json,
   const char* envelope_json,
   const char** out_plaintext_base64url
 );
