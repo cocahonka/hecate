@@ -78,6 +78,32 @@ typedef _VerifyDart =
       ffi.Pointer<pkgffi.Utf8> signatureDerBase64url,
     );
 
+// wrap_aes_for_recipients
+typedef _WrapRecipientsNative =
+    GoPivStatus Function(
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> recipientsPk9dPem,
+      ffi.Int32 recipientsCount,
+      ffi.Pointer<ffi.Pointer<ffi.Pointer<pkgffi.Utf8>>> outAesEnvelopeJson,
+    );
+typedef _WrapRecipientsDart =
+    GoPivStatus Function(
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> recipientsPk9dPem,
+      int recipientsCount,
+      ffi.Pointer<ffi.Pointer<ffi.Pointer<pkgffi.Utf8>>> outAesEnvelopeJson,
+    );
+
+// free string array
+typedef _FreeStringArrayNative =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Pointer<ffi.Char>> array,
+      ffi.Int32 length,
+    );
+typedef _FreeStringArrayDart =
+    void Function(
+      ffi.Pointer<ffi.Pointer<ffi.Char>> array,
+      int length,
+    );
+
 void main() {
   final dylibPath = File(
     '${Directory.current.path}/golang_piv_bindings/go_piv_bindings.dylib',
@@ -110,6 +136,14 @@ void main() {
   final verifyEs256 = lib.lookupFunction<_VerifyNative, _VerifyDart>(
     'go_piv_bindings_verify_signature_es256',
   );
+  final wrapRecipients = lib
+      .lookupFunction<_WrapRecipientsNative, _WrapRecipientsDart>(
+        'go_piv_bindings_wrap_aes_for_recipients',
+      );
+  final freeStringArray = lib
+      .lookupFunction<_FreeStringArrayNative, _FreeStringArrayDart>(
+        'go_piv_bindings_free_string_array',
+      );
   // slot9c policy
   final slot9cPolicy = lib
       .lookupFunction<
@@ -162,6 +196,7 @@ void main() {
     final pk9cPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
     final pk9dPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
     String? pk9cPemStr;
+    String? pk9dPemStr;
     try {
       final st = pivStatus(handle, has9c, has9d, pk9cPtr, pk9dPtr);
       if (st.code != 0) {
@@ -186,6 +221,7 @@ void main() {
       final pk9d = pk9dPtr.value;
       if (pk9d.address != 0) {
         final s = pk9d.toDartString();
+        pk9dPemStr = s;
         print('pk_9d_pem: ${s.isNotEmpty ? s.split('\n').first : s} ...');
         freeString(pk9d.cast());
       }
@@ -289,6 +325,45 @@ void main() {
         pkgffi.malloc.free(pkPtr);
         pkgffi.malloc.free(challPtr);
         pkgffi.malloc.free(sigPtr);
+      }
+    }
+
+    // demonstrate wrap_aes_for_recipients using pk_9d (single recipient)
+    if (pk9dPemStr != null && pk9dPemStr.isNotEmpty) {
+      print('wrap_aes_for_recipients demo...');
+      // prepare recipients array (1 recipient)
+      final recipients = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>(1);
+      final pk9dPemPtr = pk9dPemStr.toNativeUtf8();
+      recipients[0] = pk9dPemPtr;
+      final outArrayPtr = pkgffi
+          .calloc<ffi.Pointer<ffi.Pointer<pkgffi.Utf8>>>();
+      try {
+        final stWrap = wrapRecipients(recipients, 1, outArrayPtr);
+        if (stWrap.code != 0) {
+          final msg = stWrap.message == ffi.Pointer.fromAddress(0)
+              ? ''
+              : stWrap.message.toDartString();
+          print('wrap_aes_for_recipients failed: code=${stWrap.code} msg=$msg');
+        } else {
+          final outArray = outArrayPtr.value;
+          if (outArray.address != 0) {
+            final envPtr = outArray[0];
+            final envJson = envPtr.toDartString();
+            final formatted = const JsonEncoder.withIndent(
+              '  ',
+            ).convert(jsonDecode(envJson));
+            print('aes_envelope_json[0]:\n$formatted');
+            // free array and its strings via C helper
+            freeStringArray(outArray.cast(), 1);
+          } else {
+            print('wrap returned null array');
+          }
+        }
+      } finally {
+        // free inputs and holder
+        pkgffi.malloc.free(pk9dPemPtr);
+        pkgffi.calloc.free(recipients);
+        pkgffi.calloc.free(outArrayPtr);
       }
     }
 

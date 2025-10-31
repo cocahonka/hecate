@@ -10,16 +10,25 @@ package main
 import "C"
 import (
 	"crypto"
+	"crypto/aes"
+	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"io"
+	"math/big"
 	"sync"
 	"unsafe"
 
+	josecipher "github.com/go-jose/go-jose/v4/cipher"
 	pivlib "github.com/go-piv/piv-go/v2/piv"
+	xhkdf "golang.org/x/crypto/hkdf"
 )
 
 func main() {}
@@ -108,7 +117,7 @@ func go_piv_bindings_device_open(
 ) C.go_piv_bindings_status_t {
 	cards, cardsErr := pivlib.Cards()
 	if cardsErr != nil {
-		return err(codeTransient, "failed to enumerate card readers: "+cardsErr.Error())
+		return err(codeTransient, fmt.Sprintf("failed to enumerate card readers: %v", cardsErr))
 	}
 	if len(cards) == 0 {
 		return err(codeNotPresent, "no card readers found")
@@ -127,7 +136,7 @@ func go_piv_bindings_device_open(
 
 	if yubiKey == nil {
 		if lastOpenErr != nil {
-			return err(codeNotPresent, "no PIV tokens available, last error: "+lastOpenErr.Error())
+			return err(codeNotPresent, fmt.Sprintf("no PIV tokens available, last error: %v", lastOpenErr))
 		}
 		return err(codeNotPresent, "no PIV tokens found in available readers")
 	}
@@ -174,7 +183,7 @@ func go_piv_bindings_device_authenticate(
 
 	if _, metadataErr := yubiKey.Metadata(pinString); metadataErr != nil {
 		session.isPinVerified = false
-		return err(codePinRequired, "PIN verification failed: "+metadataErr.Error())
+		return err(codePinRequired, fmt.Sprintf("PIN verification failed: %v", metadataErr))
 	}
 
 	session.isPinVerified = true
@@ -206,7 +215,7 @@ func go_piv_bindings_piv_status(
 		}
 		spki, marshalErr := x509.MarshalPKIXPublicKey(publicKey)
 		if marshalErr != nil {
-			return err(codeInternalError, "failed to marshal public key for "+slotName+": "+marshalErr.Error())
+			return err(codeInternalError, fmt.Sprintf("failed to marshal public key for %s: %v", slotName, marshalErr))
 		}
 		pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: spki})
 		if len(pemBytes) > 0 {
@@ -218,7 +227,7 @@ func go_piv_bindings_piv_status(
 
 	// get public key from slot 9c certificate (always use current certificate)
 	if certificate, certificateErr := yubiKey.Certificate(pivlib.SlotSignature); certificateErr != nil {
-		return err(codeTransient, "failed to read certificate from slot 9c: "+certificateErr.Error())
+		return err(codeTransient, fmt.Sprintf("failed to read certificate from slot 9c: %v", certificateErr))
 	} else if certificate != nil {
 		if status := writePemPublicKey(certificate.PublicKey, outHas9c, outPk9c, "slot 9c"); status.code != 0 {
 			return status
@@ -227,7 +236,7 @@ func go_piv_bindings_piv_status(
 
 	// get public key from slot 9d certificate
 	if certificate, certificateErr := yubiKey.Certificate(pivlib.SlotKeyManagement); certificateErr != nil {
-		return err(codeTransient, "failed to read certificate from slot 9d: "+certificateErr.Error())
+		return err(codeTransient, fmt.Sprintf("failed to read certificate from slot 9d: %v", certificateErr))
 	} else if certificate != nil {
 		if status := writePemPublicKey(certificate.PublicKey, outHas9d, outPk9d, "slot 9d"); status.code != 0 {
 			return status
@@ -261,7 +270,7 @@ func go_piv_bindings_sign_challenge(
 	// read certificate from slot 9c (signature slot)
 	certificate, certificateErr := yubiKey.Certificate(pivlib.SlotSignature)
 	if certificateErr != nil {
-		return err(codeSlotEmpty, "failed to read certificate from slot 9c: "+certificateErr.Error())
+		return err(codeSlotEmpty, fmt.Sprintf("failed to read certificate from slot 9c: %v", certificateErr))
 	}
 	if certificate == nil {
 		return err(codeSlotEmpty, "no certificate found in slot 9c")
@@ -281,21 +290,21 @@ func go_piv_bindings_sign_challenge(
 	// get signer object for slot 9c private key
 	signer, privateKeyErr := yubiKey.PrivateKey(pivlib.SlotSignature, certificate.PublicKey, auth)
 	if privateKeyErr != nil {
-		return err(codePinRequired, "failed to access private key: "+privateKeyErr.Error())
+		return err(codePinRequired, fmt.Sprintf("failed to access private key: %v", privateKeyErr))
 	}
 
 	// decode challenge from base64url (no padding)
 	challengeString := C.GoString(challengeBase64url)
 	challengeBytes, decodeErr := base64.RawURLEncoding.DecodeString(challengeString)
 	if decodeErr != nil {
-		return err(codeInvalidInput, "failed to decode challenge from base64url: "+decodeErr.Error())
+		return err(codeInvalidInput, fmt.Sprintf("failed to decode challenge from base64url: %v", decodeErr))
 	}
 
 	// sign SHA-256 hash of challenge data (ES256 algorithm)
 	digest := sha256.Sum256(challengeBytes)
 	derSignature, signErr := signer.(crypto.Signer).Sign(rand.Reader, digest[:], crypto.SHA256)
 	if signErr != nil {
-		return err(codeTransient, "sign error: "+signErr.Error())
+		return err(codeTransient, fmt.Sprintf("sign error: %v", signErr))
 	}
 
 	// return DER signature encoded as base64url
@@ -308,17 +317,161 @@ func go_piv_bindings_sign_challenge(
 func go_piv_bindings_wrap_aes_for_recipients(
 	recipientsPk9dPem **C.char,
 	recipientsCount C.int32_t,
-	outEncryptedKeysBase64url ***C.char,
+	outAesEnvelopeJson ***C.char,
 ) C.go_piv_bindings_status_t {
+	if recipientsCount <= 0 || recipientsPk9dPem == nil || outAesEnvelopeJson == nil {
+		return err(codeInvalidInput, "invalid recipients list")
+	}
+
+	// read recipient public keys
+	type recipient struct {
+		publicKey9d *ecdsa.PublicKey
+	}
+	rawRecipients := unsafe.Slice(recipientsPk9dPem, int(recipientsCount))
+	recipients := make([]recipient, 0, len(rawRecipients))
+	for i, cString := range rawRecipients {
+		if cString == nil {
+			return err(codeInvalidInput, fmt.Sprintf("recipient %d: empty public key", i))
+		}
+		pemBlock, _ := pem.Decode([]byte(C.GoString(cString)))
+		if pemBlock == nil || pemBlock.Type != "PUBLIC KEY" {
+			return err(codeInvalidInput, fmt.Sprintf("recipient %d: invalid public key pem", i))
+		}
+		anyPub, parseErr := x509.ParsePKIXPublicKey(pemBlock.Bytes)
+		if parseErr != nil {
+			return err(codeInvalidInput, fmt.Sprintf("recipient %d: invalid public key spki", i))
+		}
+		ecdsaPublicKey, okCast := anyPub.(*ecdsa.PublicKey)
+		if !okCast || ecdsaPublicKey.Curve != elliptic.P256() {
+			return err(codeInvalidInput, fmt.Sprintf("recipient %d: public key is not P-256", i))
+		}
+		recipients = append(recipients, recipient{publicKey9d: ecdsaPublicKey})
+	}
+
+	// generate chat AES key (32 bytes)
+	chatAES := make([]byte, 32)
+	if _, errRand := rand.Read(chatAES); errRand != nil {
+		return err(codeInternalError, fmt.Sprintf("failed to generate AES key: %v", errRand))
+	}
+	defer zeroize(chatAES)
+
+	// generate single ephemeral EC P-256 keypair
+	ecdhGroup := ecdh.P256()
+	ephemeralPrivateKey, ephermalErr := ecdhGroup.GenerateKey(rand.Reader)
+	if ephermalErr != nil {
+		return err(codeInternalError, fmt.Sprintf("failed to generate ephemeral key: %v", ephermalErr))
+	}
+
+	// build PEM(SPKI) for ephemeral public key from uncompressed bytes (04 || X || Y)
+	ephemeralUncompressed := ephemeralPrivateKey.PublicKey().Bytes()
+	if len(ephemeralUncompressed) != 65 || ephemeralUncompressed[0] != 0x04 {
+		return err(codeInternalError, "invalid ephemeral public key bytes")
+	}
+	x := new(big.Int).SetBytes(ephemeralUncompressed[1:33])
+	y := new(big.Int).SetBytes(ephemeralUncompressed[33:65])
+	ephemeralECDSAPublicKey := ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	spki, spkiErr := x509.MarshalPKIXPublicKey(&ephemeralECDSAPublicKey)
+	if spkiErr != nil {
+		return err(codeInternalError, fmt.Sprintf("failed to marshal ephemeral public key: %v", spkiErr))
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: spki})
+	if len(pemBytes) == 0 {
+		return err(codeInternalError, "failed to encode ephemeral public key pem")
+	}
+	ephemeralPublicKeyPem := string(pemBytes)
+
+	// prepare output C array
+	outSlice := make([]*C.char, len(recipients))
+	outSliceCleanup := func() {
+		for _, p := range outSlice {
+			if p != nil {
+				C.free(unsafe.Pointer(p))
+			}
+		}
+	}
+
+	// wrap chatAES for each recipient
+	for i, recipient := range recipients {
+		// convert recipient ECDSA public key to ECDH public key (uncompressed X9.62)
+		recipientUncompressed := make([]byte, 65)
+		recipientUncompressed[0] = 0x04
+		xBytes := recipient.publicKey9d.X.Bytes()
+		yBytes := recipient.publicKey9d.Y.Bytes()
+		copy(recipientUncompressed[1+32-len(xBytes):1+32], xBytes)
+		copy(recipientUncompressed[33+32-len(yBytes):33+32], yBytes)
+		ecdhRecipientPublicKey, newPubErr := ecdhGroup.NewPublicKey(recipientUncompressed)
+		if newPubErr != nil {
+			outSliceCleanup()
+			return err(codeInvalidInput, fmt.Sprintf("invalid recipient public key for ecdh: %v", newPubErr))
+		}
+
+		// ECDH shared secret
+		shared, ecdhErr := ephemeralPrivateKey.ECDH(ecdhRecipientPublicKey)
+		defer zeroize(shared)
+		if ecdhErr != nil {
+			outSliceCleanup()
+			return err(codeInternalError, fmt.Sprintf("ecdh failed: %v", ecdhErr))
+		}
+
+		// derive KEK via HKDF-SHA256
+		reader := xhkdf.New(sha256.New, shared, nil, nil)
+		kek := make([]byte, 32)
+		defer zeroize(kek)
+		if _, readErr := io.ReadFull(reader, kek); readErr != nil {
+			outSliceCleanup()
+			return err(codeInternalError, fmt.Sprintf("hkdf failed: %v", readErr))
+		}
+
+		// AES Key Wrap (RFC 3394) of chatAES under KEK
+		cipherBlock, newCipherErr := aes.NewCipher(kek)
+		if newCipherErr != nil {
+			outSliceCleanup()
+			return err(codeInternalError, fmt.Sprintf("aes cipher init failed: %v", newCipherErr))
+		}
+		wrapped, wrapErr := josecipher.KeyWrap(cipherBlock, chatAES)
+		defer zeroize(wrapped)
+		if wrapErr != nil {
+			outSliceCleanup()
+			return err(codeInternalError, fmt.Sprintf("aes key wrap failed: %v", wrapErr))
+		}
+
+		// build JSON payload
+		payload := struct {
+			EphemeralPublicKeyPEM string `json:"ephemeral_public_key_pem"`
+			WrappedAES            string `json:"wrapped_aes"`
+		}{
+			EphemeralPublicKeyPEM: ephemeralPublicKeyPem,
+			WrappedAES:            base64.RawURLEncoding.EncodeToString(wrapped),
+		}
+
+		jsonBytes, jsonErr := json.Marshal(payload)
+		if jsonErr != nil {
+			outSliceCleanup()
+			return err(codeInternalError, fmt.Sprintf("json marshal failed: %v", jsonErr))
+		}
+		outSlice[i] = C.CString(string(jsonBytes))
+	}
+
+	// allocate C array and copy pointers
+	total := C.size_t(len(outSlice))
+	elementSize := C.size_t(unsafe.Sizeof(uintptr(0)))
+	array := (**C.char)(C.malloc(elementSize * total))
+	if array == nil {
+		outSliceCleanup()
+		return err(codeInternalError, "allocation failed")
+	}
+	arraySlice := unsafe.Slice(array, int(total))
+	copy(arraySlice, outSlice)
+	*outAesEnvelopeJson = array
 	return ok()
 }
 
 //export go_piv_bindings_encrypt_message
 func go_piv_bindings_encrypt_message(
 	handle C.go_piv_bindings_handle_t,
-	encryptedAesBase64url *C.char,
+	aesEnvelopeJson *C.char,
 	plaintextBase64url *C.char,
-	outEncryptedEnvelopeJson **C.char,
+	outMessageEnvelopeJson **C.char,
 ) C.go_piv_bindings_status_t {
 	return ok()
 }
@@ -326,7 +479,7 @@ func go_piv_bindings_encrypt_message(
 //export go_piv_bindings_decrypt_message
 func go_piv_bindings_decrypt_message(
 	handle C.go_piv_bindings_handle_t,
-	encryptedAesBase64url *C.char,
+	aesEnvelopeJson *C.char,
 	envelopeJson *C.char,
 	outPlaintextBase64url **C.char,
 ) C.go_piv_bindings_status_t {
@@ -460,4 +613,13 @@ func go_piv_bindings_free_string_array(
 		}
 	}
 	C.free(unsafe.Pointer(array))
+}
+
+func zeroize(bytes []byte) {
+	if bytes == nil {
+		return
+	}
+	for i := range bytes {
+		bytes[i] = 0
+	}
 }
