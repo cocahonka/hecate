@@ -122,6 +122,24 @@ typedef _EncryptDart =
       ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
     );
 
+// decrypt_message
+typedef _DecryptNative =
+    GoPivStatus Function(
+      ffi.Int64 handle,
+      ffi.Pointer<pkgffi.Utf8> aesEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> envelopeJson,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPlaintextBase64url,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
+    );
+typedef _DecryptDart =
+    GoPivStatus Function(
+      int handle,
+      ffi.Pointer<pkgffi.Utf8> aesEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> envelopeJson,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outPlaintextBase64url,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
+    );
+
 void main() {
   final dylibPath = File(
     '${Directory.current.path}/golang_piv_bindings/go_piv_bindings.dylib',
@@ -164,6 +182,9 @@ void main() {
       );
   final encryptMessage = lib.lookupFunction<_EncryptNative, _EncryptDart>(
     'go_piv_bindings_encrypt_message',
+  );
+  final decryptMessage = lib.lookupFunction<_DecryptNative, _DecryptDart>(
+    'go_piv_bindings_decrypt_message',
   );
   // slot9c policy
   final slot9cPolicy = lib
@@ -374,16 +395,19 @@ void main() {
               '  ',
             ).convert(jsonDecode(envJson));
             print('aes_envelope_json[0]:\n$formatted');
-            // call encrypt_message with empty plaintext
+            // call encrypt_message with plaintext = "hello world"
             final envJsonPtr = envJson.toNativeUtf8();
-            final emptyPlainPtr = ''.toNativeUtf8();
+            final plaintextB64 = base64Url
+                .encode(utf8.encode('hello world'))
+                .replaceAll('=', '');
+            final plaintextPtr = plaintextB64.toNativeUtf8();
             final outMsgPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
             try {
               final nullPin = ffi.Pointer<pkgffi.Utf8>.fromAddress(0);
               final stEnc = encryptMessage(
                 handle,
                 envJsonPtr,
-                emptyPlainPtr,
+                plaintextPtr,
                 outMsgPtr,
                 nullPin,
               );
@@ -394,14 +418,53 @@ void main() {
               if (stEnc.code == 0) {
                 final outMsg = outMsgPtr.value;
                 if (outMsg.address != 0) {
-                  final s = outMsg.toDartString();
-                  print('encrypt_message returned: $s');
+                  final envelopeJson = outMsg.toDartString();
+                  print('encrypt_message returned envelope:');
+                  final prettyEnvelope = const JsonEncoder.withIndent(
+                    '  ',
+                  ).convert(jsonDecode(envelopeJson));
+                  print(prettyEnvelope);
+
+                  // decrypt back
+                  final outPlainPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
+                  final envelopePtr = envelopeJson.toNativeUtf8();
+                  try {
+                    final stDec = decryptMessage(
+                      handle,
+                      envJsonPtr,
+                      envelopePtr,
+                      outPlainPtr,
+                      nullPin,
+                    );
+                    final decMsg = stDec.message == ffi.Pointer.fromAddress(0)
+                        ? ''
+                        : stDec.message.toDartString();
+                    print('decrypt_message: code=${stDec.code} msg=$decMsg');
+                    if (stDec.code == 0) {
+                      final plainPtr = outPlainPtr.value;
+                      if (plainPtr.address != 0) {
+                        final plainB64 = plainPtr.toDartString();
+                        final plainBytes = base64Url.decode(
+                          plainB64.padRight(
+                            (plainB64.length + 3) ~/ 4 * 4,
+                            '=',
+                          ),
+                        );
+                        print('decrypted: ${utf8.decode(plainBytes)}');
+                        freeString(plainPtr.cast());
+                      }
+                    }
+                  } finally {
+                    pkgffi.calloc.free(outPlainPtr);
+                    pkgffi.malloc.free(envelopePtr);
+                  }
+
                   freeString(outMsg.cast());
                 }
               }
             } finally {
               pkgffi.malloc.free(envJsonPtr);
-              pkgffi.malloc.free(emptyPlainPtr);
+              pkgffi.malloc.free(plaintextPtr);
               pkgffi.calloc.free(outMsgPtr);
             }
             // free array and its strings via C helper

@@ -11,6 +11,7 @@ import "C"
 import (
 	"crypto"
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -460,6 +461,70 @@ func go_piv_bindings_encrypt_message(
 	outMessageEnvelopeJson **C.char,
 	pinUtf8OrNull *C.char,
 ) C.go_piv_bindings_status_t {
+	if outMessageEnvelopeJson != nil {
+		*outMessageEnvelopeJson = nil
+	}
+	chatAES, status := deriveChatAESFromEnvelopeJSON(handle, aesEnvelopeJson, pinUtf8OrNull)
+	defer zeroize(chatAES)
+	if status.code != 0 {
+		return status
+	}
+	if chatAES == nil || len(chatAES) != 32 {
+		return err(codeInternalError, "derived aes invalid")
+	}
+
+	// decode plaintext (base64url)
+	var plaintext []byte
+	defer zeroize(plaintext)
+	if plaintextBase64url != nil {
+		plaintextGoBase64url := C.GoString(plaintextBase64url)
+		if plaintextGoBase64url != "" {
+			bytes, decodeErr := base64.RawURLEncoding.DecodeString(plaintextGoBase64url)
+			if decodeErr != nil {
+				return err(codeInvalidInput, fmt.Sprintf("invalid plaintext base64url: %v", decodeErr))
+			}
+			plaintext = bytes
+		}
+	}
+
+	// AES-GCM encrypt
+	block, blockErr := aes.NewCipher(chatAES)
+	if blockErr != nil {
+		return err(codeInternalError, fmt.Sprintf("aes cipher init failed: %v", blockErr))
+	}
+	gcm, gcmErr := cipher.NewGCM(block)
+	if gcmErr != nil {
+		return err(codeInternalError, fmt.Sprintf("gcm init failed: %v", gcmErr))
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, nonceErr := rand.Read(nonce); nonceErr != nil {
+		return err(codeInternalError, fmt.Sprintf("nonce gen failed: %v", nonceErr))
+	}
+	sealed := gcm.Seal(nil, nonce, plaintext, nil)
+	if len(sealed) < gcm.Overhead() {
+		return err(codeInternalError, "seal produced invalid size")
+	}
+	tag := sealed[len(sealed)-gcm.Overhead():]
+	ciphertext := sealed[:len(sealed)-gcm.Overhead()]
+
+	// build envelope JSON
+	envelope := struct {
+		Nonce      string `json:"nonce"`
+		Ciphertext string `json:"ciphertext"`
+		Tag        string `json:"tag"`
+	}{
+		Nonce:      base64.RawURLEncoding.EncodeToString(nonce),
+		Ciphertext: base64.RawURLEncoding.EncodeToString(ciphertext),
+		Tag:        base64.RawURLEncoding.EncodeToString(tag),
+	}
+	jsonBytes, marshalErr := json.Marshal(envelope)
+	if marshalErr != nil {
+		return err(codeInternalError, fmt.Sprintf("json marshal failed: %v", marshalErr))
+	}
+	if outMessageEnvelopeJson != nil {
+		*outMessageEnvelopeJson = C.CString(string(jsonBytes))
+	}
+
 	return ok()
 }
 
@@ -471,6 +536,76 @@ func go_piv_bindings_decrypt_message(
 	outPlaintextBase64url **C.char,
 	pinUtf8OrNull *C.char,
 ) C.go_piv_bindings_status_t {
+	if outPlaintextBase64url != nil {
+		*outPlaintextBase64url = nil
+	}
+
+	// derive chat AES from envelope
+	chatAES, status := deriveChatAESFromEnvelopeJSON(handle, aesEnvelopeJson, pinUtf8OrNull)
+	defer zeroize(chatAES)
+	if status.code != 0 {
+		return status
+	}
+	if chatAES == nil || len(chatAES) != 32 {
+		return err(codeInternalError, "derived aes invalid")
+	}
+
+	// parse message envelope JSON
+	if envelopeJson == nil || C.GoString(envelopeJson) == "" {
+		return err(codeInvalidInput, "empty envelope_json")
+	}
+	var messageEnvelope struct {
+		Nonce      string `json:"nonce"`
+		Ciphertext string `json:"ciphertext"`
+		Tag        string `json:"tag"`
+	}
+	if unmarshalErr := json.Unmarshal([]byte(C.GoString(envelopeJson)), &messageEnvelope); unmarshalErr != nil {
+		return err(codeInvalidInput, fmt.Sprintf("invalid envelope_json: %v", unmarshalErr))
+	}
+	if messageEnvelope.Nonce == "" || messageEnvelope.Ciphertext == "" || messageEnvelope.Tag == "" {
+		return err(codeInvalidInput, "missing fields in envelope_json")
+	}
+	nonce, nonceErr := base64.RawURLEncoding.DecodeString(messageEnvelope.Nonce)
+	if nonceErr != nil {
+		return err(codeInvalidInput, fmt.Sprintf("invalid nonce (base64url): %v", nonceErr))
+	}
+	ciphertext, ciphertextErr := base64.RawURLEncoding.DecodeString(messageEnvelope.Ciphertext)
+	if ciphertextErr != nil {
+		return err(codeInvalidInput, fmt.Sprintf("invalid ciphertext (base64url): %v", ciphertextErr))
+	}
+	tag, tagErr := base64.RawURLEncoding.DecodeString(messageEnvelope.Tag)
+	if tagErr != nil {
+		return err(codeInvalidInput, fmt.Sprintf("invalid tag (base64url): %v", tagErr))
+	}
+
+	// reconstruct sealed = ciphertext || tag
+	sealed := make([]byte, 0, len(ciphertext)+len(tag))
+	sealed = append(sealed, ciphertext...)
+	sealed = append(sealed, tag...)
+	defer zeroize(ciphertext)
+	defer zeroize(tag)
+
+	// AES-GCM decrypt
+	block, blockErr := aes.NewCipher(chatAES)
+	if blockErr != nil {
+		return err(codeInternalError, fmt.Sprintf("aes cipher init failed: %v", blockErr))
+	}
+	gcm, gcmErr := cipher.NewGCM(block)
+	if gcmErr != nil {
+		return err(codeInternalError, fmt.Sprintf("gcm init failed: %v", gcmErr))
+	}
+	if len(nonce) != gcm.NonceSize() {
+		return err(codeInvalidInput, "invalid nonce size")
+	}
+	plaintext, openErr := gcm.Open(nil, nonce, sealed, nil)
+	if openErr != nil {
+		return err(codeTransient, fmt.Sprintf("gcm open failed: %v", openErr))
+	}
+
+	// return base64url plaintext
+	if outPlaintextBase64url != nil {
+		*outPlaintextBase64url = C.CString(base64.RawURLEncoding.EncodeToString(plaintext))
+	}
 	return ok()
 }
 
