@@ -104,6 +104,24 @@ typedef _FreeStringArrayDart =
       int length,
     );
 
+// encrypt_message
+typedef _EncryptNative =
+    GoPivStatus Function(
+      ffi.Int64 handle,
+      ffi.Pointer<pkgffi.Utf8> aesEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> plaintextBase64url,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outMessageEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
+    );
+typedef _EncryptDart =
+    GoPivStatus Function(
+      int handle,
+      ffi.Pointer<pkgffi.Utf8> aesEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> plaintextBase64url,
+      ffi.Pointer<ffi.Pointer<pkgffi.Utf8>> outMessageEnvelopeJson,
+      ffi.Pointer<pkgffi.Utf8> pinUtf8OrNull,
+    );
+
 void main() {
   final dylibPath = File(
     '${Directory.current.path}/golang_piv_bindings/go_piv_bindings.dylib',
@@ -144,6 +162,9 @@ void main() {
       .lookupFunction<_FreeStringArrayNative, _FreeStringArrayDart>(
         'go_piv_bindings_free_string_array',
       );
+  final encryptMessage = lib.lookupFunction<_EncryptNative, _EncryptDart>(
+    'go_piv_bindings_encrypt_message',
+  );
   // slot9c policy
   final slot9cPolicy = lib
       .lookupFunction<
@@ -353,6 +374,36 @@ void main() {
               '  ',
             ).convert(jsonDecode(envJson));
             print('aes_envelope_json[0]:\n$formatted');
+            // call encrypt_message with empty plaintext
+            final envJsonPtr = envJson.toNativeUtf8();
+            final emptyPlainPtr = ''.toNativeUtf8();
+            final outMsgPtr = pkgffi.calloc<ffi.Pointer<pkgffi.Utf8>>();
+            try {
+              final nullPin = ffi.Pointer<pkgffi.Utf8>.fromAddress(0);
+              final stEnc = encryptMessage(
+                handle,
+                envJsonPtr,
+                emptyPlainPtr,
+                outMsgPtr,
+                nullPin,
+              );
+              final msg = stEnc.message == ffi.Pointer.fromAddress(0)
+                  ? ''
+                  : stEnc.message.toDartString();
+              print('encrypt_message: code=${stEnc.code} msg=$msg');
+              if (stEnc.code == 0) {
+                final outMsg = outMsgPtr.value;
+                if (outMsg.address != 0) {
+                  final s = outMsg.toDartString();
+                  print('encrypt_message returned: $s');
+                  freeString(outMsg.cast());
+                }
+              }
+            } finally {
+              pkgffi.malloc.free(envJsonPtr);
+              pkgffi.malloc.free(emptyPlainPtr);
+              pkgffi.calloc.free(outMsgPtr);
+            }
             // free array and its strings via C helper
             freeStringArray(outArray.cast(), 1);
           } else {

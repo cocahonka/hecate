@@ -22,7 +22,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"math/big"
 	"sync"
 	"unsafe"
 
@@ -362,15 +361,8 @@ func go_piv_bindings_wrap_aes_for_recipients(
 		return err(codeInternalError, fmt.Sprintf("failed to generate ephemeral key: %v", ephermalErr))
 	}
 
-	// build PEM(SPKI) for ephemeral public key from uncompressed bytes (04 || X || Y)
-	ephemeralUncompressed := ephemeralPrivateKey.PublicKey().Bytes()
-	if len(ephemeralUncompressed) != 65 || ephemeralUncompressed[0] != 0x04 {
-		return err(codeInternalError, "invalid ephemeral public key bytes")
-	}
-	x := new(big.Int).SetBytes(ephemeralUncompressed[1:33])
-	y := new(big.Int).SetBytes(ephemeralUncompressed[33:65])
-	ephemeralECDSAPublicKey := ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
-	spki, spkiErr := x509.MarshalPKIXPublicKey(&ephemeralECDSAPublicKey)
+	// build PEM(SPKI) for ephemeral public key
+	spki, spkiErr := x509.MarshalPKIXPublicKey(ephemeralPrivateKey.PublicKey())
 	if spkiErr != nil {
 		return err(codeInternalError, fmt.Sprintf("failed to marshal ephemeral public key: %v", spkiErr))
 	}
@@ -392,14 +384,8 @@ func go_piv_bindings_wrap_aes_for_recipients(
 
 	// wrap chatAES for each recipient
 	for i, recipient := range recipients {
-		// convert recipient ECDSA public key to ECDH public key (uncompressed X9.62)
-		recipientUncompressed := make([]byte, 65)
-		recipientUncompressed[0] = 0x04
-		xBytes := recipient.publicKey9d.X.Bytes()
-		yBytes := recipient.publicKey9d.Y.Bytes()
-		copy(recipientUncompressed[1+32-len(xBytes):1+32], xBytes)
-		copy(recipientUncompressed[33+32-len(yBytes):33+32], yBytes)
-		ecdhRecipientPublicKey, newPubErr := ecdhGroup.NewPublicKey(recipientUncompressed)
+		// convert recipient ECDSA public key to ECDH public key
+		ecdhRecipientPublicKey, newPubErr := recipient.publicKey9d.ECDH()
 		if newPubErr != nil {
 			outSliceCleanup()
 			return err(codeInvalidInput, fmt.Sprintf("invalid recipient public key for ecdh: %v", newPubErr))
@@ -472,6 +458,7 @@ func go_piv_bindings_encrypt_message(
 	aesEnvelopeJson *C.char,
 	plaintextBase64url *C.char,
 	outMessageEnvelopeJson **C.char,
+	pinUtf8OrNull *C.char,
 ) C.go_piv_bindings_status_t {
 	return ok()
 }
@@ -482,6 +469,7 @@ func go_piv_bindings_decrypt_message(
 	aesEnvelopeJson *C.char,
 	envelopeJson *C.char,
 	outPlaintextBase64url **C.char,
+	pinUtf8OrNull *C.char,
 ) C.go_piv_bindings_status_t {
 	return ok()
 }
@@ -622,4 +610,124 @@ func zeroize(bytes []byte) {
 	for i := range bytes {
 		bytes[i] = 0
 	}
+}
+
+// parses AES envelope JSON and attempts to unwrap chat AES using YubiKey slot 9d.
+// Returns a 32-byte AES key on success and status.code=0, otherwise returns nil and error status.
+func deriveChatAESFromEnvelopeJSON(
+	handle C.go_piv_bindings_handle_t,
+	aesEnvelopeJson *C.char,
+	pinUtf8OrNull *C.char,
+) ([]byte, C.go_piv_bindings_status_t) {
+	if aesEnvelopeJson == nil || C.GoString(aesEnvelopeJson) == "" {
+		return nil, err(codeInvalidInput, "empty aes_envelope_json")
+	}
+
+	// parse JSON
+	var parsed struct {
+		EphemeralPublicKeyPEM string `json:"ephemeral_public_key_pem"`
+		WrappedAES            string `json:"wrapped_aes"`
+	}
+	if unmarshalErr := json.Unmarshal([]byte(C.GoString(aesEnvelopeJson)), &parsed); unmarshalErr != nil {
+		return nil, err(codeInvalidInput, fmt.Sprintf("invalid aes_envelope_json: %v", unmarshalErr))
+	}
+	if parsed.EphemeralPublicKeyPEM == "" || parsed.WrappedAES == "" {
+		return nil, err(codeInvalidInput, "missing fields in aes_envelope_json")
+	}
+
+	// decode wrapped key
+	wrappedBytes, base64Err := base64.RawURLEncoding.DecodeString(parsed.WrappedAES)
+	if base64Err != nil {
+		return nil, err(codeInvalidInput, fmt.Sprintf("invalid wrapped_aes (base64url): %v", base64Err))
+	}
+	if len(wrappedBytes) < 16 || len(wrappedBytes)%8 != 0 {
+		return nil, err(codeInvalidInput, fmt.Sprintf("invalid wrapped_aes length: %d", len(wrappedBytes)))
+	}
+	defer zeroize(wrappedBytes)
+
+	// parse ephemeral public key PEM -> ECDSA -> ECDH public key (uncompressed 0x04||X||Y)
+	pemBlock, _ := pem.Decode([]byte(parsed.EphemeralPublicKeyPEM))
+	if pemBlock == nil || pemBlock.Type != "PUBLIC KEY" {
+		return nil, err(codeInvalidInput, "invalid ephemeral_public_key_pem")
+	}
+	anyPub, parseErr := x509.ParsePKIXPublicKey(pemBlock.Bytes)
+	if parseErr != nil {
+		return nil, err(codeInternalError, fmt.Sprintf("invalid ephemeral spki: %v", parseErr))
+	}
+	ephECDSAPub, isECDSA := anyPub.(*ecdsa.PublicKey)
+	if !isECDSA || ephECDSAPub.Curve != elliptic.P256() {
+		return nil, err(codeInvalidInput, "ephemeral public key is not P-256")
+	}
+
+	// convert ephemeral ECDSA public key to ECDH public key
+	peerECDH, peerConvertErr := ephECDSAPub.ECDH()
+	if peerConvertErr != nil {
+		return nil, err(codeInternalError, fmt.Sprintf("invalid ephemeral public key: %v", peerConvertErr))
+	}
+
+	// obtain shared secret via YubiKey 9d (ECDH) using P-256
+	yubiKey, session, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return nil, status
+	}
+	session.mutex.Lock()
+	defer session.mutex.Unlock()
+
+	// fetch 9d certificate to bind the private key object
+	certificate9d, certificateErr := yubiKey.Certificate(pivlib.SlotKeyManagement)
+	if certificateErr != nil || certificate9d == nil {
+		return nil, err(codeSlotEmpty, fmt.Sprintf("failed to read certificate from slot 9d: %v", certificateErr))
+	}
+	if pk, ok := certificate9d.PublicKey.(*ecdsa.PublicKey); !ok || pk.Curve != elliptic.P256() {
+		return nil, err(codeInternalError, "slot 9d certificate is not ECDSA P-256")
+	}
+
+	// build auth
+	var keyAuth pivlib.KeyAuth
+	if pinUtf8OrNull != nil {
+		if pinString := C.GoString(pinUtf8OrNull); pinString != "" {
+			keyAuth = pivlib.KeyAuth{PIN: pinString}
+		}
+	} else if session.isPinVerified {
+		keyAuth = pivlib.KeyAuth{}
+	}
+	privateKeyAny, privateKeyErr := yubiKey.PrivateKey(pivlib.SlotKeyManagement, certificate9d.PublicKey, keyAuth)
+	if privateKeyErr != nil || privateKeyAny == nil {
+		return nil, err(codePinRequired, fmt.Sprintf("failed to access key 9d: %v", privateKeyErr))
+	}
+
+	// type assert to piv ECDSAPrivateKey to call ECDH
+	ecdsaPrivateKey, isECDSAPrivateKey := privateKeyAny.(*pivlib.ECDSAPrivateKey)
+	if !isECDSAPrivateKey {
+		return nil, err(codeInternalError, "slot 9d is not ECDSA P-256 key")
+	}
+	shared, ecdhErr := ecdsaPrivateKey.ECDH(peerECDH)
+	if ecdhErr != nil || len(shared) == 0 {
+		return nil, err(codeInternalError, fmt.Sprintf("ecdh failed: %v", ecdhErr))
+	}
+	defer zeroize(shared)
+
+	// derive KEK via HKDF-SHA256 — MUST match wrap side parameters exactly.
+	reader := xhkdf.New(sha256.New, shared, nil, nil)
+	kek := make([]byte, 32)
+	if _, readErr := io.ReadFull(reader, kek); readErr != nil {
+		return nil, err(codeInternalError, fmt.Sprintf("hkdf failed: %v", readErr))
+	}
+	defer zeroize(kek)
+
+	// unwrap chat AES via josecipher (RFC3394)
+	cipherBlock, newCipherErr := aes.NewCipher(kek)
+	if newCipherErr != nil {
+		return nil, err(codeInternalError, fmt.Sprintf("aes cipher init failed: %v", newCipherErr))
+	}
+	chatAES, unwrapErr := josecipher.KeyUnwrap(cipherBlock, wrappedBytes)
+	if unwrapErr != nil || len(chatAES) != 32 {
+		if chatAES != nil {
+			zeroize(chatAES)
+		}
+		return nil, err(codeInternalError, fmt.Sprintf("aes key unwrap failed: %v", unwrapErr))
+	}
+
+	// caller MUST zeroize chatAES after use
+	return chatAES, ok()
 }

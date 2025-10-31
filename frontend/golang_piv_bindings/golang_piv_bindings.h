@@ -108,21 +108,25 @@ go_piv_bindings_status_t go_piv_bindings_wrap_aes_for_recipients(
 // plaintext_base64url: plaintext in base64url.
 // Output envelope_json: AES-GCM envelope JSON:
 //   { "nonce": "base64url", "ciphertext": "base64url", "tag": "base64url" }
+// pin_utf8_or_null: optional UTF-8 PIN; pass NULL when not needed (e.g., PINPolicyNever/Once after authenticate).
 // The library allocates the string; the caller must free it with go_piv_bindings_free_string.
 go_piv_bindings_status_t go_piv_bindings_encrypt_message(
   go_piv_bindings_handle_t handle,
   const char* aes_envelope_json,
   const char* plaintext_base64url,
-  const char** out_message_envelope_json
+  const char** out_message_envelope_json,
+  const char* pin_utf8_or_null
 );
 
 // Decrypt a message using the chat AES key recovered from aes_envelope_json and the given message envelope JSON.
+// pin_utf8_or_null: optional UTF-8 PIN; pass NULL when not needed (e.g., PINPolicyNever/Once after authenticate).
 // Returns plaintext_base64url. The library allocates the string; the caller must free it with go_piv_bindings_free_string.
 go_piv_bindings_status_t go_piv_bindings_decrypt_message(
   go_piv_bindings_handle_t handle,
   const char* aes_envelope_json,
   const char* envelope_json,
-  const char** out_plaintext_base64url
+  const char** out_plaintext_base64url,
+  const char* pin_utf8_or_null
 );
 
 // Query slot 9c policies. Returns numeric policies:
