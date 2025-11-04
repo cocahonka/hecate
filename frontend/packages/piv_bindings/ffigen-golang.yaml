@@ -1,0 +1,20 @@
+name: GeneratedGolangPivBindings
+description: Dart FFI bindings for the Go PIV c-shared library
+output: lib/src/ffi/golang_piv_bindings.ffigen.dart
+headers:
+  entry-points:
+    - golang_piv_bindings/golang_piv_bindings.h
+  include-directives:
+    - "golang_piv_bindings/golang_piv_bindings.h"
+compiler-opts:
+  - "-Igolang_piv_bindings"
+exclude-all-by-default: true
+functions:
+  include:
+    - "go_piv_bindings_.*"
+structs:
+  include:
+    - "go_piv_bindings_.*"
+typedefs:
+  include:
+    - "go_piv_bindings_.*"

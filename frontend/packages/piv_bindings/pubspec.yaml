@@ -1,0 +1,13 @@
+name: piv_bindings
+resolution: workspace
+
+environment:
+  sdk: ^3.9.2
+  flutter: 3.35.7
+
+dependencies:
+  ffi: 2.1.4
+  meta: any
+
+dev_dependencies:
+  ffigen: 19.1.0
