@@ -108,3 +108,6 @@ melos_*.yaml
 
 # Cursor related
 .cursorignore
+
+# Bindings distribution
+bindings_dist/

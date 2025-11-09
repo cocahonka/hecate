@@ -3,20 +3,59 @@
     "configurations": [
         {
             "name": "Flutter: Debug",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
             "request": "launch",
             "type": "dart",
+            "preLaunchTask": "pre-launch-all",
+            "args": [
+                "--dart-define-from-file=.env"
+            ],
+            "env": {
+                "PUB_HOSTED_URL": "https://pub.dev",
+            }
+        },
+        {
+            "name": "Flutter: Profile",
             "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "preLaunchTask": "pre-launch-all",
+            "flutterMode": "profile",
+            "args": [
+                "--dart-define-from-file=.env"
+            ],
+            "env": {
+                "PUB_HOSTED_URL": "https://pub.dev"
+            }
+        },
+        {
+            "name": "Flutter: Release",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "preLaunchTask": "pre-launch-all",
+            "flutterMode": "release",
+            "args": [
+                "--dart-define-from-file=.env"
+            ],
             "env": {
                 "PUB_HOSTED_URL": "https://pub.dev"
             }
         },
         {
             "name": "Dart: Run bin",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/bin/main.dart",
             "request": "launch",
             "type": "dart",
-            "program": "${workspaceFolder}/bin/main.dart",
             "console": "terminal",
-            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "pre-launch-all",
+            "args": [
+                "--dart-define-from-file=.env"
+            ],
             "env": {
                 "PUB_HOSTED_URL": "https://pub.dev"
             }

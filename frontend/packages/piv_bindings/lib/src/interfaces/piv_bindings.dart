@@ -58,7 +58,15 @@ extension type BindingsHandle(int handle) {}
 abstract interface class PivBindings {
   factory PivBindings({
     required DynamicLibrary library,
-  }) = PivBindings$GolangImpl;
+  }) {
+    const bindingsType = String.fromEnvironment('BINDINGS_TYPE');
+    return switch (bindingsType) {
+      'GOLANG' => PivBindings$GolangImpl(library: library),
+      _ => throw UnimplementedError(
+        'Bindings type $bindingsType not implemented',
+      ),
+    };
+  }
 
   /// Open the first available PIV device and start a session.
   ///

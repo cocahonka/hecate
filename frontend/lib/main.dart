@@ -7,22 +7,16 @@ import 'dart:math';
 
 import 'package:piv_bindings/piv_bindings.dart';
 
-const dylibPath =
-    'packages/piv_bindings/golang_piv_bindings/go_piv_bindings.dylib';
-
 String b64urlNoPad(List<int> bytes) =>
     base64Url.encode(bytes).replaceAll('=', '');
 String b64urlNormalize(String s) => s.padRight((s.length + 3) ~/ 4 * 4, '=');
 List<int> b64urlNoPadDecode(String s) => base64Url.decode(b64urlNormalize(s));
 
 void main() async {
-  if (!File(dylibPath).existsSync()) {
-    print('dylib not found at: $dylibPath');
-    return;
-  }
-
-  // Load library and create bindings
-  final lib = DynamicLibrary.open(dylibPath);
+  const dylibName = String.fromEnvironment(
+    'BINDINGS_DYLIB_NAME',
+  );
+  final lib = DynamicLibrary.open(dylibName);
   final piv = PivBindings(library: lib);
 
   // 1. Open device
