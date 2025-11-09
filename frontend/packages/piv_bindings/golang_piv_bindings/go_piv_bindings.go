@@ -255,7 +255,7 @@ func go_piv_bindings_sign_challenge(
 ) C.go_piv_bindings_status_t {
 	*outSignatureDerBase64url = nil
 
-	if challengeBase64url == nil {
+	if challengeBase64url == nil || C.GoString(challengeBase64url) == "" {
 		return err(codeInvalidInput, "empty challenge")
 	}
 
@@ -290,7 +290,7 @@ func go_piv_bindings_sign_challenge(
 	// get signer object for slot 9c private key
 	signer, privateKeyErr := yubiKey.PrivateKey(pivlib.SlotSignature, certificate.PublicKey, auth)
 	if privateKeyErr != nil {
-		return err(codePinRequired, fmt.Sprintf("failed to access private key: %v", privateKeyErr))
+		return err(codeTransient, fmt.Sprintf("failed to access private key: %v", privateKeyErr))
 	}
 
 	// decode challenge from base64url (no padding)
@@ -304,7 +304,7 @@ func go_piv_bindings_sign_challenge(
 	digest := sha256.Sum256(challengeBytes)
 	derSignature, signErr := signer.(crypto.Signer).Sign(rand.Reader, digest[:], crypto.SHA256)
 	if signErr != nil {
-		return err(codeTransient, fmt.Sprintf("sign error: %v", signErr))
+		return err(codePinRequired, fmt.Sprintf("sign error: %v", signErr))
 	}
 
 	// return DER signature encoded as base64url
@@ -330,7 +330,7 @@ func go_piv_bindings_wrap_aes_for_recipients(
 	rawRecipients := unsafe.Slice(recipientsPk9dPem, int(recipientsCount))
 	recipients := make([]recipient, 0, len(rawRecipients))
 	for i, cString := range rawRecipients {
-		if cString == nil {
+		if cString == nil || C.GoString(cString) == "" {
 			return err(codeInvalidInput, fmt.Sprintf("recipient %d: empty public key", i))
 		}
 		pemBlock, _ := pem.Decode([]byte(C.GoString(cString)))
@@ -476,16 +476,15 @@ func go_piv_bindings_encrypt_message(
 	// decode plaintext (base64url)
 	var plaintext []byte
 	defer zeroize(plaintext)
-	if plaintextBase64url != nil {
-		plaintextGoBase64url := C.GoString(plaintextBase64url)
-		if plaintextGoBase64url != "" {
-			bytes, decodeErr := base64.RawURLEncoding.DecodeString(plaintextGoBase64url)
-			if decodeErr != nil {
-				return err(codeInvalidInput, fmt.Sprintf("invalid plaintext base64url: %v", decodeErr))
-			}
-			plaintext = bytes
-		}
+	if plaintextBase64url == nil || C.GoString(plaintextBase64url) == "" {
+		return err(codeInvalidInput, "empty plaintext")
 	}
+	plaintextGoBase64url := C.GoString(plaintextBase64url)
+	bytes, decodeErr := base64.RawURLEncoding.DecodeString(plaintextGoBase64url)
+	if decodeErr != nil {
+		return err(codeInvalidInput, fmt.Sprintf("invalid plaintext base64url: %v", decodeErr))
+	}
+	plaintext = bytes
 
 	// AES-GCM encrypt
 	block, blockErr := aes.NewCipher(chatAES)
@@ -631,6 +630,61 @@ func go_piv_bindings_piv_slot9c_policy(
 
 	// get slot attestation certificate
 	slotCertificate, slotErr := yubiKey.Attest(pivlib.SlotSignature)
+	if slotErr != nil || slotCertificate == nil {
+		return err(codeUnknownPolicy, "slot attestation unavailable")
+	}
+
+	// verify attestation certificate
+	attestation, verifyErr := pivlib.Verify(attestationCertificate, slotCertificate)
+	if verifyErr != nil {
+		return err(codeUnknownPolicy, "attestation verify failed")
+	}
+
+	switch attestation.PINPolicy {
+	case pivlib.PINPolicyNever:
+		*outPinPolicy = 0
+	case pivlib.PINPolicyOnce:
+		*outPinPolicy = 1
+	case pivlib.PINPolicyAlways:
+		*outPinPolicy = 2
+	default:
+		return err(codeUnknownPolicy, "unknown pin policy")
+	}
+	switch attestation.TouchPolicy {
+	case pivlib.TouchPolicyNever:
+		*outTouchPolicy = 0
+	case pivlib.TouchPolicyAlways:
+		*outTouchPolicy = 1
+	case pivlib.TouchPolicyCached:
+		*outTouchPolicy = 2
+	default:
+		return err(codeUnknownPolicy, "unknown touch policy")
+	}
+	return ok()
+}
+
+//export go_piv_bindings_piv_slot9d_policy
+func go_piv_bindings_piv_slot9d_policy(
+	handle C.go_piv_bindings_handle_t,
+	outPinPolicy *C.int32_t,
+	outTouchPolicy *C.int32_t,
+) C.go_piv_bindings_status_t {
+	*outPinPolicy = 0
+	*outTouchPolicy = 0
+
+	yubiKey, _, status := validateHandleAndGetYubiKey(handle)
+	if status.code != 0 {
+		return status
+	}
+
+	// get attestation certificate
+	attestationCertificate, attestationErr := yubiKey.AttestationCertificate()
+	if attestationErr != nil || attestationCertificate == nil {
+		return err(codeUnknownPolicy, "attestation cert unavailable")
+	}
+
+	// get slot attestation certificate for 9d
+	slotCertificate, slotErr := yubiKey.Attest(pivlib.SlotKeyManagement)
 	if slotErr != nil || slotCertificate == nil {
 		return err(codeUnknownPolicy, "slot attestation unavailable")
 	}
@@ -838,7 +892,7 @@ func deriveChatAESFromEnvelopeJSON(
 	}
 	shared, ecdhErr := ecdsaPrivateKey.ECDH(peerECDH)
 	if ecdhErr != nil || len(shared) == 0 {
-		return nil, err(codeInternalError, fmt.Sprintf("ecdh failed: %v", ecdhErr))
+		return nil, err(codePinRequired, fmt.Sprintf("ecdh failed: %v", ecdhErr))
 	}
 	defer zeroize(shared)
 

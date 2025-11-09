@@ -333,6 +333,38 @@ class GeneratedGolangPivBindings {
             )
           >();
 
+  go_piv_bindings_status_t go_piv_bindings_piv_slot9d_policy(
+    int handle,
+    ffi.Pointer<ffi.Int32> out_pin_policy,
+    ffi.Pointer<ffi.Int32> out_touch_policy,
+  ) {
+    return _go_piv_bindings_piv_slot9d_policy(
+      handle,
+      out_pin_policy,
+      out_touch_policy,
+    );
+  }
+
+  late final _go_piv_bindings_piv_slot9d_policyPtr =
+      _lookup<
+        ffi.NativeFunction<
+          go_piv_bindings_status_t Function(
+            go_piv_bindings_handle_t,
+            ffi.Pointer<ffi.Int32>,
+            ffi.Pointer<ffi.Int32>,
+          )
+        >
+      >('go_piv_bindings_piv_slot9d_policy');
+  late final _go_piv_bindings_piv_slot9d_policy =
+      _go_piv_bindings_piv_slot9d_policyPtr
+          .asFunction<
+            go_piv_bindings_status_t Function(
+              int,
+              ffi.Pointer<ffi.Int32>,
+              ffi.Pointer<ffi.Int32>,
+            )
+          >();
+
   void go_piv_bindings_free_string(
     ffi.Pointer<ffi.Char> string,
   ) {

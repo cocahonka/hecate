@@ -139,6 +139,16 @@ go_piv_bindings_status_t go_piv_bindings_piv_slot9c_policy(
   int32_t* out_touch_policy
 );
 
+// Query slot 9d policies. Returns numeric policies:
+// out_pin_policy  : 0=Never, 1=Once, 2=Always
+// out_touch_policy: 0=Never, 1=Always, 2=Cached
+// If policies cannot be determined (e.g., attestation unsupported), returns status.code=7 (unknown policy).
+go_piv_bindings_status_t go_piv_bindings_piv_slot9d_policy(
+  go_piv_bindings_handle_t handle,
+  int32_t* out_pin_policy,
+  int32_t* out_touch_policy
+);
+
 // Free a single string previously allocated and returned by the library.
 void go_piv_bindings_free_string(
   const char* string

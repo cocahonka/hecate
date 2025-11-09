@@ -2,6 +2,7 @@
 
 import 'dart:ffi';
 
+import 'package:meta/meta.dart';
 import 'package:piv_bindings/src/implementations/golang/piv_bindings.dart';
 import 'package:piv_bindings/src/interfaces/models/models.dart';
 
@@ -41,6 +42,12 @@ typedef PivSlot9cPolicyResult = ({
   TouchPolicy touchPolicy,
 });
 
+typedef PivSlot9dPolicyResult = ({
+  PivBindingsStatus status,
+  PinPolicy pinPolicy,
+  TouchPolicy touchPolicy,
+});
+
 /// Wrapper over a native session handle returned by the bindings.
 ///
 /// The numeric [handle] is valid only when the originating call returned
@@ -58,8 +65,13 @@ extension type BindingsHandle(int handle) {}
 abstract interface class PivBindings {
   factory PivBindings({
     required DynamicLibrary library,
+    @visibleForTesting String? testBindingsType,
   }) {
-    const bindingsType = String.fromEnvironment('BINDINGS_TYPE');
+    final bindingsType =
+        testBindingsType ??
+        const String.fromEnvironment(
+          'BINDINGS_TYPE',
+        );
     return switch (bindingsType) {
       'GOLANG' => PivBindings$GolangImpl(library: library),
       _ => throw UnimplementedError(
@@ -148,6 +160,11 @@ abstract interface class PivBindings {
 
   /// Retrieve 9c PIN and touch policies.
   PivSlot9cPolicyResult getPivSlot9cPolicy({
+    required BindingsHandle handle,
+  });
+
+  /// Retrieve 9d PIN and touch policies.
+  PivSlot9dPolicyResult getPivSlot9dPolicy({
     required BindingsHandle handle,
   });
 }

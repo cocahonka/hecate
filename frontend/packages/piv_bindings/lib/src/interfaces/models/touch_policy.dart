@@ -19,6 +19,16 @@ sealed class TouchPolicy {
   factory TouchPolicy.never() = TouchPolicy$Never._;
   factory TouchPolicy.always() = TouchPolicy$Always._;
   factory TouchPolicy.cached() = TouchPolicy$Cached._;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, code);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TouchPolicy &&
+          runtimeType == other.runtimeType &&
+          code == other.code;
 }
 
 final class TouchPolicy$Never extends TouchPolicy {

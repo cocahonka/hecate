@@ -309,9 +309,15 @@ final class PivBindings$GolangImpl implements PivBindings {
       if (messageEnvelopePtr != nullptr) {
         _bindings.go_piv_bindings_free_string(messageEnvelopePtr);
       }
-      final messageEnvelope = MessageEnvelope.fromJson(
-        json.decode(messageEnvelopeJson) as Map<String, Object?>,
-      );
+      final messageEnvelope = status is PivBindingsStatus$Ok
+          ? MessageEnvelope.fromJson(
+              json.decode(messageEnvelopeJson) as Map<String, Object?>,
+            )
+          : MessageEnvelope(
+              nonce: '',
+              ciphertext: '',
+              tag: '',
+            );
 
       return (
         status: status,
@@ -382,7 +388,9 @@ final class PivBindings$GolangImpl implements PivBindings {
   }
 
   @override
-  PivSlot9cPolicyResult getPivSlot9cPolicy({required BindingsHandle handle}) {
+  PivSlot9cPolicyResult getPivSlot9cPolicy({
+    required BindingsHandle handle,
+  }) {
     // 1. Allocate native memory
     final outPinPolicyPtr = calloc<Int32>();
     final outTouchPolicyPtr = calloc<Int32>();
@@ -390,6 +398,37 @@ final class PivBindings$GolangImpl implements PivBindings {
     try {
       // 2. Native call
       final statusC = _bindings.go_piv_bindings_piv_slot9c_policy(
+        handle.handle,
+        outPinPolicyPtr,
+        outTouchPolicyPtr,
+      );
+
+      // 3. Convert to Dart values
+      final status = _mapStatus(statusC);
+      final pinPolicy = PinPolicy.fromCode(outPinPolicyPtr.value);
+      final touchPolicy = TouchPolicy.fromCode(outTouchPolicyPtr.value);
+
+      return (
+        status: status,
+        pinPolicy: pinPolicy,
+        touchPolicy: touchPolicy,
+      );
+    } finally {
+      // 5. Free allocated memory
+      calloc.free(outPinPolicyPtr);
+      calloc.free(outTouchPolicyPtr);
+    }
+  }
+
+  @override
+  PivSlot9dPolicyResult getPivSlot9dPolicy({required BindingsHandle handle}) {
+    // 1. Allocate native memory
+    final outPinPolicyPtr = calloc<Int32>();
+    final outTouchPolicyPtr = calloc<Int32>();
+
+    try {
+      // 2. Native call
+      final statusC = _bindings.go_piv_bindings_piv_slot9d_policy(
         handle.handle,
         outPinPolicyPtr,
         outTouchPolicyPtr,

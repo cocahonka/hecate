@@ -19,6 +19,16 @@ sealed class PinPolicy {
   factory PinPolicy.never() = PinPolicy$Never._;
   factory PinPolicy.once() = PinPolicy$Once._;
   factory PinPolicy.always() = PinPolicy$Always._;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, code);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PinPolicy &&
+          runtimeType == other.runtimeType &&
+          code == other.code;
 }
 
 final class PinPolicy$Never extends PinPolicy {
