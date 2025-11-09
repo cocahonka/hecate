@@ -13,7 +13,6 @@ workspace:
 dependencies:
   flutter:
     sdk: flutter
-  ffi: 2.1.4
   piv_bindings: any
 
 dev_dependencies:

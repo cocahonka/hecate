@@ -303,13 +303,12 @@ final class PivBindings$GolangImpl implements PivBindings {
       // 3. Convert to Dart values
       final status = _mapStatus(statusC);
       final messageEnvelopePtr = outMessageEnvelopePtrPtr.value;
+      final messageEnvelopeJson = messageEnvelopePtr.toDartStringOrEmpty();
 
       // 4. Free API-returned memory
       if (messageEnvelopePtr != nullptr) {
         _bindings.go_piv_bindings_free_string(messageEnvelopePtr);
       }
-
-      final messageEnvelopeJson = messageEnvelopePtr.toDartStringOrEmpty();
       final messageEnvelope = MessageEnvelope.fromJson(
         json.decode(messageEnvelopeJson) as Map<String, Object?>,
       );
