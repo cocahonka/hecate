@@ -39,8 +39,16 @@ type CacheConfig struct {
 
 func MustLoad(path string) *Config {
 	var cfg Config
-	if err := cleanenv.ReadConfig(path, &cfg); err != nil {
-		panic(err)
+	
+	// If path is empty or file doesn't exist, read only from env vars
+	if path == "" {
+		if err := cleanenv.ReadEnv(&cfg); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := cleanenv.ReadConfig(path, &cfg); err != nil {
+			panic(err)
+		}
 	}
 	return &cfg
 }
