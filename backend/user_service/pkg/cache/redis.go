@@ -7,10 +7,10 @@ import (
 )
 
 func NewRedis(ctx context.Context, addr, password string) (*redis.Client, error) {
-
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
+		Network:  "tcp4", // Force IPv4
 	})
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, err
