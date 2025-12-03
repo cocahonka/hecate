@@ -1,0 +1,8 @@
+include: package:coca_lints/analysis_options.yaml
+formatter:
+  trailing_commas: preserve
+analyzer:
+  errors:
+    sort_constructors_first: ignore
+    prefer_const_constructors_in_immutables: ignore
+    invalid_use_of_visible_for_testing_member: error

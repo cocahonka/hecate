@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build:bindings",
+            "type": "shell",
+            "command": "make all",
+            "problemMatcher": []
+        },
+        {
+            "label": "pre-launch-all",
+            "type": "shell",
+            "dependsOn": [
+                "build:bindings",
+            ],
+            "dependsOrder": "sequence",
+            "command": "echo pre-launch-all done",
+            "problemMatcher": []
+        }
+    ]
+}
