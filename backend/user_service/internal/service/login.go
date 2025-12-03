@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
@@ -87,13 +86,7 @@ func (s *LoginService) Verify(ctx context.Context, nickname, signature string) (
 		return "", "", err // Consider returning domain.ErrUserNotFound
 	}
 
-	decodedSignature, err := base64.RawURLEncoding.DecodeString(signature)
-	if err != nil {
-		log.Error("failed to decode signature", zap.Error(err))
-		return "", "", err // Consider returning a domain-specific error for bad request
-	}
-
-	isValid, err := verifySignature([]byte(user.Pub9c), []byte(challenge), decodedSignature)
+	isValid, err := verifySignature([]byte(user.Pub9c), challenge, signature)
 	if err != nil {
 		log.Error("error during signature verification", zap.Error(err))
 		return "", "", err
