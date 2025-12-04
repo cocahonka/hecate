@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
@@ -55,8 +56,13 @@ func (s *LoginService) Init(ctx context.Context, nickname string) (string, error
 
 	_, err := s.userProvider.Get(ctx, nickname)
 	if err != nil {
-		log.Warn("login attempt for non-existent user")
-		return "", domain.ErrUserNotFound
+		if errors.Is(err, domain.ErrUserNotFound) {
+			log.Warn("login attempt for non-existent user")
+			return "", domain.ErrUserNotFound
+		}
+
+		log.Error("failed to get user during login init", zap.Error(err))
+		return "", err
 	}
 
 	challenge := generateChallenge()
