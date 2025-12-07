@@ -5,6 +5,7 @@ set -e
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
     CREATE DATABASE user_service;
     CREATE DATABASE chat_service;
+    CREATE DATABASE message_service;
 EOSQL
 
 # Init User Service DB
@@ -36,4 +37,17 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "chat_service" <<-E
     );
 
     CREATE INDEX idx_chat_members_user_id ON chat_members(user_id);
+EOSQL
+
+# Init Message Service DB
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "message_service" <<-EOSQL
+    CREATE TABLE messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        chat_id UUID NOT NULL,
+        sender_id UUID NOT NULL,
+        encrypted_payload TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX idx_messages_chat_created ON messages(chat_id, created_at DESC);
 EOSQL

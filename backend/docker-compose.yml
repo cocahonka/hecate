@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: hecate_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres # Default DB
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./infrastructure/postgres-init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - hecate-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    command: redis-server --requirepass password
+    container_name: hecate_redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+    networks:
+      - hecate-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  user-service:
+    build:
+      context: ./user_service
+      dockerfile: Dockerfile
+    container_name: hecate_user_service
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=user_service
+      - CACHE_HOST=redis
+      - CACHE_PORT=6379
+      - CACHE_PASSWORD=password
+      - JWT_SECRET=your-secret-key-here
+      - ENV=development
+      - CHALLENGE_TTL=2m
+      - SERVER_PORT=8082
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hecate-network
+
+  chat-service:
+    build:
+      context: ./chat_service
+      dockerfile: Dockerfile
+    container_name: hecate_chat_service
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=chat_service
+      - CACHE_HOST=redis
+      - CACHE_PORT=6379
+      - CACHE_PASSWORD=password
+      - JWT_SECRET=your-secret-key-here
+      - ENV=development
+      - SERVER_PORT=8083
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hecate-network
+
+  message-service:
+    build:
+      context: ./message_service
+      dockerfile: Dockerfile
+    container_name: hecate_message_service
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=message_service
+      - CACHE_HOST=redis
+      - CACHE_PORT=6379
+      - CACHE_PASSWORD=password
+      - JWT_SECRET=your-secret-key-here
+      - ENV=development
+      - SERVER_PORT=8084
+      - CHAT_SERVICE_URL=http://chat-service:8083
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chat-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - hecate-network
+
+networks:
+  hecate-network:
+    driver: bridge
