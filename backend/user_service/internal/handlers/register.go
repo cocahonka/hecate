@@ -25,7 +25,7 @@ func (h *Handler) Init(ctx *gin.Context) {
 	var req InitRegisterRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request"})
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request: " + err.Error()})
 		return
 	}
 

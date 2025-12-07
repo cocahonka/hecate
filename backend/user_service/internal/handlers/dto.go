@@ -50,3 +50,10 @@ type RefreshTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
+
+type GetUserResponse struct {
+	ID       string `json:"id"`
+	Nickname string `json:"nickname"`
+	Pub9c    string `json:"pub9c"`
+	Pub9d    string `json:"pub9d"`
+}

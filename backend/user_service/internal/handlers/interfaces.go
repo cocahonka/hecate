@@ -1,6 +1,10 @@
 package handler
 
-import "context"
+import (
+	"context"
+
+	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
+)
 
 //go:generate mockery
 
@@ -15,4 +19,9 @@ type LoginManager interface {
 	Init(ctx context.Context, nickname string) (string, error)
 	Verify(ctx context.Context, nickname, signature string) (accessToken, refreshToken string, err error)
 	Refresh(ctx context.Context, refreshToken string, nickname *string) (accessToken, newRefreshToken string, err error)
+}
+
+// UserManager defines the interface for user data operations.
+type UserManager interface {
+	Get(ctx context.Context, nickname string) (*domain.User, error)
 }

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "5436:5432"
     volumes:
       - ./migrations:/docker-entrypoint-initdb.d
     restart: unless-stopped
@@ -24,7 +24,7 @@ services:
     command: redis-server --requirepass password
     container_name: hecate_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     restart: unless-stopped
     networks:
       - hecate-network
