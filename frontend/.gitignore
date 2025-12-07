@@ -105,6 +105,7 @@ melos_*.yaml
 
 # Junk and drafts
 .junk
+junk.context
 
 # Cursor related
 .cursorignore

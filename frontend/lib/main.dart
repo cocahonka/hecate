@@ -1,19 +1,40 @@
-// ignore_for_file: avoid_print
+import 'dart:async';
 
-import 'dart:ffi';
-
-import 'package:piv_bindings/piv_bindings.dart';
+import 'package:flutter/material.dart';
+import 'package:hecate/features/app/di/app_scope.dart';
+import 'package:hecate/features/app/presentation/screens/app_scope_failed_screen.dart';
+import 'package:hecate/features/app/presentation/widgets/app_wrapper.dart';
+import 'package:l/l.dart';
 
 void main() {
-  const dylibName = String.fromEnvironment('BINDINGS_DYLIB_NAME');
-  final lib = DynamicLibrary.open(dylibName);
-  final bindings = PivBindings(library: lib);
+  l.capture<void>(
+    () => runZonedGuarded(
+      () async {
+        Future<void> createScopeAndRun() async {
+          final appScopeHolder = AppScopeHolder();
+          try {
+            await appScopeHolder.create();
+            runApp(
+              AppWrapper(
+                onDispose: () => appScopeHolder.drop(),
+                appScopeHolder: appScopeHolder,
+              ),
+            );
+          } on Object catch (error, stackTrace) {
+            appScopeHolder.drop().ignore();
+            runApp(
+              AppScopeFailedScreen(
+                error: error,
+                stackTrace: stackTrace,
+                onRetry: () async => createScopeAndRun(),
+              ),
+            );
+          }
+        }
 
-  final openResult = bindings.openDevice();
-  final handle = openResult.handle;
-
-  final statusResult = bindings.getPivStatus(handle: handle);
-  print(statusResult);
-
-  bindings.closeDevice(handle: handle);
+        await createScopeAndRun();
+      },
+      l.e,
+    ),
+  );
 }

@@ -14,6 +14,17 @@ dependencies:
   flutter:
     sdk: flutter
   piv_bindings: any
+  meta: any
+  dio: 5.9.0
+  l: 5.0.1
+  synchronized: 3.4.0
+  flutter_secure_storage: 9.2.4
+  shared_preferences: 2.5.3
+  rxdart: 0.28.0
+  yx_state: 1.0.0
+  yx_state_flutter: 1.0.0
+  yx_scope: 1.1.2
+  yx_scope_flutter: 1.1.2
 
 dev_dependencies:
   coca_lints: 1.0.1
