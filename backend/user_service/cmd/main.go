@@ -69,9 +69,10 @@ func main() {
 
 	RegisterService := service.NewRegisterService(logger, userRepo, cacheRepo, userRepo, cfg.ChallengeTTL)
 	LoginService := service.NewLoginService(logger, cacheRepo, userRepo, userRepo, tokenService, tokenService, cacheRepo, cfg.ChallengeTTL, cfg.JWT.RefreshTokenTTL)
+	UserService := service.NewUserService(logger, userRepo)
 
 	//Создание HTTP сервера
-	handlers := handler.NewHandler(RegisterService, LoginService)
+	handlers := handler.NewHandler(RegisterService, LoginService, UserService)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.ServerPort),
 		Handler: handlers.InitRoutes(cfg.Env),

@@ -1,0 +1,8 @@
+with-expecter: true
+packages:
+  github.com/cocahonka/hecate/backend/chat_service/internal/repository:
+    config:
+      dir: internal/repository/mocks
+    interfaces:
+      - ChatRepository
+      - ChatMemberRepository

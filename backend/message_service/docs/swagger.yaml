@@ -1,0 +1,147 @@
+basePath: /api/v1
+definitions:
+  handlers.HistoryResponse:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/handlers.MessageResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.MessageResponse:
+    properties:
+      chat_id:
+        type: string
+      created_at:
+        type: string
+      encrypted_payload:
+        type: string
+      id:
+        type: string
+      sender_id:
+        type: string
+    type: object
+  handlers.SendMessageRequest:
+    properties:
+      chat_id:
+        type: string
+      encrypted_payload:
+        type: string
+    required:
+    - chat_id
+    - encrypted_payload
+    type: object
+host: localhost:8084
+info:
+  contact: {}
+  description: API Server for Message Service
+  title: Message Service API
+  version: "1.0"
+paths:
+  /messages:
+    get:
+      description: Get messages for a specific chat with pagination
+      parameters:
+      - description: Chat ID
+        in: query
+        name: chat_id
+        required: true
+        type: string
+      - description: Limit (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HistoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get message history
+      tags:
+      - messages
+    post:
+      consumes:
+      - application/json
+      description: Send an encrypted message to a chat
+      parameters:
+      - description: Message payload
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Send a message
+      tags:
+      - messages
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

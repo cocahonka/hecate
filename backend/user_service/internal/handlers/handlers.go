@@ -12,12 +12,14 @@ var userServicePrefix = "/user"
 type Handler struct {
 	register RegisterManager
 	login    LoginManager
+	user     UserManager
 }
 
-func NewHandler(register RegisterManager, login LoginManager) *Handler {
+func NewHandler(register RegisterManager, login LoginManager, user UserManager) *Handler {
 	return &Handler{
 		register: register,
 		login:    login,
+		user:     user,
 	}
 }
 
@@ -34,6 +36,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 		routes.POST("/login/init", h.InitLogin)
 		routes.POST("/login/verify", h.VerifyLogin)
 		routes.POST("/login/refresh", h.RefreshToken)
+		routes.GET("/user/:nickname", h.GetUser)
 	}
 
 	routes.GET("/ping", func(c *gin.Context) {
