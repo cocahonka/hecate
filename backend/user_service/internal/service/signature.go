@@ -4,13 +4,20 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
 )
 
-func verifySignature(publicKeyPem, challenge, signature []byte) (bool, error) {
-	block, _ := pem.Decode([]byte(publicKeyPem))
+// verifySignature verifies an ES256 signature produced by the PIV device.
+//
+// Both challenge and signature are expected to be base64url-encoded strings
+// without padding, matching the format used by the PIV bindings and the
+// user_service API. The function decodes them and verifies the ASN.1 DER
+// ECDSA signature against the decoded challenge bytes.
+func verifySignature(publicKeyPem []byte, challengeBase64url, signatureBase64url string) (bool, error) {
+	block, _ := pem.Decode(publicKeyPem)
 	if block == nil {
 		return false, domain.ErrInvalidPublicKey
 	}
@@ -23,6 +30,16 @@ func verifySignature(publicKeyPem, challenge, signature []byte) (bool, error) {
 		return false, domain.ErrFailedToConvertToECDSA
 	}
 
-	hash := sha256.Sum256(challenge)
-	return ecdsa.VerifyASN1(ecdsaKey, hash[:], signature), nil
+	challengeBytes, err := base64.RawURLEncoding.DecodeString(challengeBase64url)
+	if err != nil {
+		return false, err
+	}
+
+	signatureBytes, err := base64.RawURLEncoding.DecodeString(signatureBase64url)
+	if err != nil {
+		return false, err
+	}
+
+	hash := sha256.Sum256(challengeBytes)
+	return ecdsa.VerifyASN1(ecdsaKey, hash[:], signatureBytes), nil
 }

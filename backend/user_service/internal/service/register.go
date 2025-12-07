@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"time"
 
@@ -74,12 +73,8 @@ func (r *Register) VerifyAndComplete(ctx context.Context, nickname, signedChalle
 		r.logger.Error("failed to load challenge from cache")
 		return err
 	}
-	encSignedChallenge, err := base64.RawURLEncoding.DecodeString(signedChallengeBase64)
-	if err != nil {
-		return err
-	}
 
-	isValid, err := verifySignature([]byte(pub9c), []byte(challenge), encSignedChallenge)
+	isValid, err := verifySignature([]byte(pub9c), challenge, signedChallengeBase64)
 	if err != nil {
 		return err
 	}
