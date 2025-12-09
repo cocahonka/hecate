@@ -659,6 +659,7 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 			};
 			name = Debug;
 		};
@@ -708,6 +709,7 @@
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 			};
 			name = Release;
 		};

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hecate/features/auth/data/storage/auth_tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +17,8 @@ abstract interface class AuthStorage {
 }
 
 final class AuthStorageImpl implements AuthStorage {
+  // TODO(cocahonka): Secure storage requires the developer's signature, d
+  // drop it for macOS for now
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;
 
@@ -38,6 +42,12 @@ final class AuthStorageImpl implements AuthStorage {
 
   @override
   Future<void> saveTokens(AuthTokens tokens) async {
+    if (Platform.isMacOS) {
+      await _prefs.setString(_accessTokenKey, tokens.accessToken);
+      await _prefs.setString(_refreshTokenKey, tokens.refreshToken);
+      return;
+    }
+
     await _secureStorage.write(
       key: _accessTokenKey,
       value: tokens.accessToken,
@@ -55,12 +65,20 @@ final class AuthStorageImpl implements AuthStorage {
 
   @override
   Future<AuthTokens?> readTokens() async {
-    final accessToken = await _secureStorage.read(
-      key: _accessTokenKey,
-    );
-    final refreshToken = await _secureStorage.read(
-      key: _refreshTokenKey,
-    );
+    String? accessToken;
+    String? refreshToken;
+
+    if (Platform.isMacOS) {
+      accessToken = _prefs.getString(_accessTokenKey);
+      refreshToken = _prefs.getString(_refreshTokenKey);
+    } else {
+      accessToken = await _secureStorage.read(
+        key: _accessTokenKey,
+      );
+      refreshToken = await _secureStorage.read(
+        key: _refreshTokenKey,
+      );
+    }
     if (accessToken == null || refreshToken == null) {
       return null;
     }
@@ -72,8 +90,13 @@ final class AuthStorageImpl implements AuthStorage {
 
   @override
   Future<void> clear() async {
-    await _secureStorage.delete(key: _accessTokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
+    if (Platform.isMacOS) {
+      await _prefs.remove(_accessTokenKey);
+      await _prefs.remove(_refreshTokenKey);
+    } else {
+      await _secureStorage.delete(key: _accessTokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+    }
     await _prefs.remove(_userKey);
   }
 }

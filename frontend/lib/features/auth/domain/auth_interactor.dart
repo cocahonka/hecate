@@ -10,7 +10,7 @@ import 'package:yx_scope/yx_scope.dart';
 abstract interface class AuthInteractor implements AsyncLifecycle {
   Future<String?> getNickname();
 
-  Future<void> register({
+  Future<bool> register({
     required String nickname,
     required String? pin,
   });
@@ -109,6 +109,10 @@ final class AuthInteractorImpl implements AuthInteractor {
       l.i('Register failed: failed to verify register');
       return false;
     }
+
+    await _stateManager.setUnauthenticated(
+      nickname: nickname,
+    );
 
     return true;
   }

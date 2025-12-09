@@ -48,11 +48,15 @@ final class AppScopeContainer extends ScopeContainer
   );
 
   late final dioDep = dep(
-    () => Dio(
-      BaseOptions(
-        baseUrl: const String.fromEnvironment('API_BASE_URL'),
-      ),
-    ),
+    () =>
+        Dio(
+            BaseOptions(
+              baseUrl: const String.fromEnvironment('API_BASE_URL'),
+            ),
+          )
+          ..interceptors.add(
+            LogInterceptor(),
+          ),
   );
 
   late final prefsDep = asyncDep<PrefsProvider>(
