@@ -10,6 +10,8 @@ void main() {
   l.capture<void>(
     () => runZonedGuarded(
       () async {
+        WidgetsFlutterBinding.ensureInitialized();
+
         Future<void> createScopeAndRun() async {
           final appScopeHolder = AppScopeHolder();
           try {
@@ -21,7 +23,6 @@ void main() {
               ),
             );
           } on Object catch (error, stackTrace) {
-            appScopeHolder.drop().ignore();
             runApp(
               AppScopeFailedScreen(
                 error: error,

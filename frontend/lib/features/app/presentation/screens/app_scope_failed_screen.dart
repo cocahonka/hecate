@@ -43,38 +43,40 @@ class _AppScopeFailedScreenState extends State<AppScopeFailedScreen> {
               final typography = theme.textTheme;
               final colorScheme = theme.colorScheme;
 
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Main scope initialization failed',
-                        style: typography.headlineMedium,
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.refresh),
-                        onPressed: inProgress ? null : () => _retry(),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '${widget.error}',
-                    style: typography.bodyLarge?.copyWith(
-                      color: colorScheme.error,
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Main scope initialization failed',
+                          style: typography.headlineMedium,
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.refresh),
+                          onPressed: inProgress ? null : () => _retry(),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 16),
-                  Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Text(
-                      '${widget.stackTrace}',
-                      style: typography.bodyLarge,
+                    SizedBox(height: 16),
+                    Text(
+                      '${widget.error}',
+                      style: typography.bodyLarge?.copyWith(
+                        color: colorScheme.error,
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 16),
+                    Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text(
+                        '${widget.stackTrace}',
+                        style: typography.bodyLarge,
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           ),
