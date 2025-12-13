@@ -1,5 +1,6 @@
 import 'dart:ffi';
 
+import 'package:flutter/foundation.dart';
 import 'package:hecate/features/bindings/domain/bindings_interactor.dart';
 import 'package:hecate/features/bindings/domain/bindings_state.dart';
 import 'package:hecate/features/bindings/domain/bindings_state_manager.dart';
@@ -34,11 +35,23 @@ final class BindingsScopeModule<ParentScopeContainer extends ScopeContainer>
     () => BindingsStateManagerImpl(),
   );
 
-  late final interactorDep = asyncDep<BindingsInteractor>(
+  late final interactorDep = rawAsyncDep<BindingsInteractor>(
     () => BindingsInteractorImpl(
       bindings: _pivBindingsDep.get,
       stateManager: stateManagerDep.get,
     ),
+    init: (dep) async {
+      if (kDebugMode) {
+        // due to hot restart, we need to close all sessions,
+        // because flutter kill the main isolate without calling dispose,
+        // therefore yubikey session is not closed after hot restart.
+        _pivBindingsDep.get.closeAllDevices();
+      }
+      return dep.init();
+    },
+    dispose: (dep) async {
+      return dep.dispose();
+    },
   );
 
   @override

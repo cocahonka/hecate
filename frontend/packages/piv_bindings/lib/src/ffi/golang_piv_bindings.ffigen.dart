@@ -57,6 +57,18 @@ class GeneratedGolangPivBindings {
   late final _go_piv_bindings_device_close = _go_piv_bindings_device_closePtr
       .asFunction<go_piv_bindings_status_t Function(int)>();
 
+  go_piv_bindings_status_t go_piv_bindings_device_close_all() {
+    return _go_piv_bindings_device_close_all();
+  }
+
+  late final _go_piv_bindings_device_close_allPtr =
+      _lookup<ffi.NativeFunction<go_piv_bindings_status_t Function()>>(
+        'go_piv_bindings_device_close_all',
+      );
+  late final _go_piv_bindings_device_close_all =
+      _go_piv_bindings_device_close_allPtr
+          .asFunction<go_piv_bindings_status_t Function()>();
+
   go_piv_bindings_status_t go_piv_bindings_device_authenticate(
     int handle,
     ffi.Pointer<ffi.Char> pin_utf8,

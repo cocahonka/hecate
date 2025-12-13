@@ -146,6 +146,8 @@ final class BindingsInteractorImpl implements BindingsInteractor {
       return null;
     }
 
+    await _stateManager.setOpened(handle: state.handle);
+
     return (
       pk9cPem: result.pk9cPem,
       pk9dPem: result.pk9dPem,
@@ -198,6 +200,8 @@ final class BindingsInteractorImpl implements BindingsInteractor {
       );
       return null;
     }
+
+    await _stateManager.setOpened(handle: state.handle);
 
     return result.signatureDerBase64url;
   }

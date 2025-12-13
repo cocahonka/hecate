@@ -61,6 +61,15 @@ final class PivBindings$GolangImpl implements PivBindings {
   }
 
   @override
+  PivBindingsStatus closeAllDevices() {
+    // 2. Native call
+    final statusC = _bindings.go_piv_bindings_device_close_all();
+
+    // 3. Convert to Dart values
+    return _mapStatus(statusC);
+  }
+
+  @override
   PivBindingsStatus authenticateDevice({
     required BindingsHandle handle,
     required String pin,

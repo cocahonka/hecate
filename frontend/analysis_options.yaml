@@ -11,3 +11,4 @@ analyzer:
     invalid_use_of_visible_for_testing_member: error
     unawaited_futures: warning
     prefer_const_constructors: ignore
+    prefer_const_literals_to_create_immutables: ignore

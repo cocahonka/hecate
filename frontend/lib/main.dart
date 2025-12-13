@@ -18,7 +18,9 @@ void main() {
             await appScopeHolder.create();
             runApp(
               AppWrapper(
-                onDispose: () => appScopeHolder.drop(),
+                onDispose: () async => {
+                  await appScopeHolder.drop(),
+                },
                 appScopeHolder: appScopeHolder,
               ),
             );

@@ -89,6 +89,27 @@ func closeSession(handleId int64) *Session {
 	return session
 }
 
+// closeAllSessions removes and returns all active sessions in a snapshot.
+// Caller is responsible for closing underlying YubiKey handles.
+func closeAllSessions() []*Session {
+	globalMutex.Lock()
+	defer globalMutex.Unlock()
+
+	if len(handleToSession) == 0 {
+		return nil
+	}
+
+	sessions := make([]*Session, 0, len(handleToSession))
+	for handle, session := range handleToSession {
+		if session != nil {
+			sessions = append(sessions, session)
+		}
+		delete(handleToSession, handle)
+	}
+
+	return sessions
+}
+
 func getSession(handleId int64) (*Session, bool) {
 	globalMutex.Lock()
 	defer globalMutex.Unlock()
@@ -153,6 +174,24 @@ func go_piv_bindings_device_close(
 	handleId := int64(handle)
 	session := closeSession(handleId)
 	if session != nil {
+		session.mutex.Lock()
+		if session.yubiKey != nil {
+			_ = session.yubiKey.Close()
+			session.yubiKey = nil
+		}
+		session.mutex.Unlock()
+	}
+	return ok()
+}
+
+//export go_piv_bindings_device_close_all
+func go_piv_bindings_device_close_all() C.go_piv_bindings_status_t {
+	// Best-effort: close all active sessions and their underlying YubiKeys.
+	sessions := closeAllSessions()
+	for _, session := range sessions {
+		if session == nil {
+			continue
+		}
 		session.mutex.Lock()
 		if session.yubiKey != nil {
 			_ = session.yubiKey.Close()
