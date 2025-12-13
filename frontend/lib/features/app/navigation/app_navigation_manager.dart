@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hecate/features/app/di/app_scope.dart';
+import 'package:hecate/features/app/navigation/app_navigation_revalidator.dart';
 import 'package:hecate/features/app/navigation/app_navigator.dart';
 import 'package:hecate/features/app/navigation/app_pages.dart';
 import 'package:hecate/features/auth/domain/auth_state.dart';
@@ -13,11 +14,15 @@ abstract interface class AppNavigationManager implements AsyncLifecycle {
 
   List<NavigatorObserver> get observers;
 
-  Listenable? get revalidate;
+  Listenable get revalidate;
 }
 
 final class AppNavigationManagerImpl implements AppNavigationManager {
-  AppNavigationManagerImpl();
+  final AppNavigationRevalidator _revalidator;
+
+  AppNavigationManagerImpl({
+    required AppNavigationRevalidator revalidator,
+  }) : _revalidator = revalidator;
 
   @override
   final ValueNotifier<AppNavigationState> controller = ValueNotifier(
@@ -51,7 +56,7 @@ final class AppNavigationManagerImpl implements AppNavigationManager {
   List<NavigatorObserver> get observers => [];
 
   @override
-  Listenable? get revalidate => null;
+  Listenable get revalidate => _revalidator;
 
   @override
   Future<void> init() async {}

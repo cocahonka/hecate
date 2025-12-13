@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:hecate/core/prefs_provider.dart';
-import 'package:hecate/features/app/navigation/app_navigation_manager.dart';
+import 'package:hecate/features/app/navigation/app_navigation_revalidator.dart';
+import 'package:hecate/features/app/navigation/di/navigation_scope.dart';
 import 'package:hecate/features/auth/di/auth_scope.dart';
 import 'package:hecate/features/bindings/di/bindings_scope.dart';
 import 'package:yx_scope/yx_scope.dart';
@@ -10,7 +11,7 @@ abstract interface class AppScope implements Scope {
 
   AuthScope get auth;
 
-  AppNavigationManager get navigationManager;
+  NavigationScope get navigation;
 
   Dio get dio;
 
@@ -18,19 +19,25 @@ abstract interface class AppScope implements Scope {
 }
 
 final class AppScopeContainer extends ScopeContainer
-    implements AppScope, AuthParentScope {
+    implements
+        AppScope,
+        BindingsParentScope,
+        AuthParentScope,
+        NavigationParentScope {
   @override
   List<Set<AsyncDep<Object>>> get initializeQueue => [
     {
-      navigationManagerDep,
+      navigationScopeHolderDep.get.revalidatorDep,
       bindingsScopeHolderDep.get.stateManagerDep,
       prefsDep,
       authScopeHolderDep.get.stateManagerDep,
     },
     {
+      navigationScopeHolderDep.get.managerDep,
       bindingsScopeHolderDep.get.interactorDep,
     },
     {
+      authScopeHolderDep.get.observerDep,
       authScopeHolderDep.get.interactorDep,
     },
   ];
@@ -43,8 +50,8 @@ final class AppScopeContainer extends ScopeContainer
     () => AuthScopeModule(this),
   );
 
-  late final navigationManagerDep = asyncDep(
-    () => AppNavigationManagerImpl(),
+  late final navigationScopeHolderDep = dep(
+    () => NavigationScopeModule(this),
   );
 
   late final dioDep = dep(
@@ -70,13 +77,17 @@ final class AppScopeContainer extends ScopeContainer
   AuthScope get auth => authScopeHolderDep.get;
 
   @override
-  AppNavigationManager get navigationManager => navigationManagerDep.get;
+  NavigationScope get navigation => navigationScopeHolderDep.get;
 
   @override
   Dio get dio => dioDep.get;
 
   @override
   PrefsProvider get prefs => prefsDep.get;
+
+  @override
+  AppNavigationRevalidator get navigationRevalidator =>
+      navigationScopeHolderDep.get.revalidator;
 }
 
 final class AppScopeHolder

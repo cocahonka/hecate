@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:hecate/features/app/navigation/app_navigation_revalidator.dart';
+import 'package:hecate/features/auth/domain/auth_interceptor.dart';
 import 'package:hecate/features/auth/domain/auth_state.dart';
 import 'package:hecate/features/auth/domain/auth_state_manager.dart';
 import 'package:rxdart/rxdart.dart';
@@ -11,17 +13,20 @@ abstract interface class AuthObserver implements AsyncLifecycle {}
 final class AuthObserverImpl implements AuthObserver {
   final AuthStateManager _authStateManager;
   final Dio _dio;
-  final Interceptor _refreshInterceptor;
+  final AuthInterceptor _refreshInterceptor;
+  final AppNavigationRevalidator _navigationRevalidator;
 
   StreamSubscription<void>? _authStateSubscription;
 
   AuthObserverImpl({
     required AuthStateManager authStateManager,
     required Dio dio,
-    required Interceptor refreshInterceptor,
+    required AuthInterceptor refreshInterceptor,
+    required AppNavigationRevalidator navigationRevalidator,
   }) : _authStateManager = authStateManager,
        _dio = dio,
-       _refreshInterceptor = refreshInterceptor;
+       _refreshInterceptor = refreshInterceptor,
+       _navigationRevalidator = navigationRevalidator;
 
   @override
   Future<void> init() async {
@@ -35,6 +40,7 @@ final class AuthObserverImpl implements AuthObserver {
             switch (state) {
               case AuthState$Unauthenticated():
                 _dio.interceptors.remove(_refreshInterceptor);
+                _navigationRevalidator.revalidate();
               case AuthState$Authenticated():
                 _dio.interceptors.add(_refreshInterceptor);
             }

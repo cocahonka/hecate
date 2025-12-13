@@ -14,7 +14,11 @@ abstract interface class BindingsScope {
   BindingsInteractor get interactor;
 }
 
-final class BindingsScopeModule<ParentScopeContainer extends ScopeContainer>
+abstract interface class BindingsParentScope extends ScopeContainer {}
+
+final class BindingsScopeModule<
+  ParentScopeContainer extends BindingsParentScope
+>
     extends ScopeModule<ParentScopeContainer>
     implements BindingsScope {
   BindingsScopeModule(super.container);

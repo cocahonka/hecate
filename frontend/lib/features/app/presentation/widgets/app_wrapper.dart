@@ -35,10 +35,10 @@ class _AppWrapperState extends State<AppWrapper> {
             home: Stack(
               children: [
                 AppNavigator.controlled(
-                  controller: scope.navigationManager.controller,
-                  guards: scope.navigationManager.guards,
-                  observers: scope.navigationManager.observers,
-                  revalidate: scope.navigationManager.revalidate,
+                  controller: scope.navigation.manager.controller,
+                  guards: scope.navigation.manager.guards,
+                  observers: scope.navigation.manager.observers,
+                  revalidate: scope.navigation.manager.revalidate,
                 ),
                 Positioned(
                   top: 12,
