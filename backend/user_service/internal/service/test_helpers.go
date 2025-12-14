@@ -80,7 +80,9 @@ func generateKeyPairAndSignature(t *testing.T, challenge string) (pubKeyPEM, sig
 	pubKeyPEM = string(pem.EncodeToMemory(publicKeyBlock))
 
 	// Sign challenge
-	hash := sha256.Sum256([]byte(challenge))
+	challengeBytes, err := base64.RawURLEncoding.DecodeString(challenge)
+	require.NoError(t, err)
+	hash := sha256.Sum256(challengeBytes)
 	sig, err := ecdsa.SignASN1(rand.Reader, privateKey, hash[:])
 	require.NoError(t, err)
 

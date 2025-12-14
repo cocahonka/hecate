@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -49,7 +50,7 @@ func (r *User) Get(ctx context.Context, nickname string) (*domain.User, error) {
 	return user, nil
 }
 
-func (r *User) GetByID(ctx context.Context, userID string) (*domain.User, error) {
+func (r *User) GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	user := &domain.User{}
 	err := r.pool.QueryRow(ctx,
 		"SELECT id, nickname, pubkey_auth, pubkey_enc FROM users WHERE id=$1",

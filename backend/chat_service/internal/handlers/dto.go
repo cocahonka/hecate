@@ -30,3 +30,12 @@ type IsMemberResponse struct {
 type EncryptedKeyResponse struct {
 	EncryptedKey string `json:"encrypted_key"`
 }
+
+type ChatMemberResponse struct {
+	UserID   uuid.UUID `json:"user_id"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
+type ChatMembersResponse struct {
+	Members []*ChatMemberResponse `json:"members"`
+}

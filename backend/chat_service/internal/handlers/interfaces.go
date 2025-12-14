@@ -14,4 +14,5 @@ type ChatService interface {
 	CheckUserIsMember(ctx context.Context, chatID, userID uuid.UUID) (bool, error)
 	GetUserChats(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Chat, error)
 	GetEncryptedKey(ctx context.Context, chatID, userID uuid.UUID) (string, error)
+	GetChatMembers(ctx context.Context, chatID, userID uuid.UUID) ([]*domain.ChatMember, error)
 }

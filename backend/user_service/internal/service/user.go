@@ -5,6 +5,7 @@ import (
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
 	handler "github.com/cocahonka/hecate/backend/user_service/internal/handlers"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -24,4 +25,8 @@ func NewUserService(logger *zap.Logger, userProvider UserProvider) *UserService 
 
 func (s *UserService) Get(ctx context.Context, nickname string) (*domain.User, error) {
 	return s.userProvider.Get(ctx, nickname)
+}
+
+func (s *UserService) GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	return s.userProvider.GetByID(ctx, userID)
 }

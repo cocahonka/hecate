@@ -26,7 +26,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 	}
 
 	router := gin.Default()
-	
+
 	// Swagger (TASK-23) - Placeholder, need to import gin-swagger
 	// router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
@@ -39,6 +39,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 			chats.GET("/:id", h.getChat)
 			chats.GET("/:id/member", h.checkMember)
 			chats.GET("/:id/key", h.getEncryptedKey)
+			chats.GET("/:id/members", h.getChatMembers)
 		}
 	}
 

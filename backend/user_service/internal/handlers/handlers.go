@@ -37,6 +37,7 @@ func (h *Handler) InitRoutes(env string) http.Handler {
 		routes.POST("/login/verify", h.VerifyLogin)
 		routes.POST("/login/refresh", h.RefreshToken)
 		routes.GET("/user/:nickname", h.GetUser)
+		routes.GET("/user/id/:id", h.GetUserByID)
 	}
 
 	routes.GET("/ping", func(c *gin.Context) {

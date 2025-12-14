@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
+	"github.com/google/uuid"
 )
 
 //go:generate mockery
@@ -24,4 +25,5 @@ type LoginManager interface {
 // UserManager defines the interface for user data operations.
 type UserManager interface {
 	Get(ctx context.Context, nickname string) (*domain.User, error)
+	GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 }

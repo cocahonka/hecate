@@ -69,14 +69,13 @@ func TestLoginService_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			challengeManagerMock := mocks.NewMockchallengeManager(t)
 			userProviderMock := mocks.NewMockUserProvider(t)
-			userProviderByIDMock := mocks.NewMockUserProviderByID(t)
 			tokenGeneratorMock := mocks.NewMockTokenGenerator(t)
 			tokenValidatorMock := mocks.NewMockTokenValidator(t)
 			refreshTokenManagerMock := mocks.NewMockRefreshTokenManager(t)
 
 			tt.setupMocks(challengeManagerMock, userProviderMock, tokenGeneratorMock)
 
-			service := NewLoginService(logger, challengeManagerMock, userProviderMock, userProviderByIDMock, tokenGeneratorMock, tokenValidatorMock, refreshTokenManagerMock, 0, 0)
+			service := NewLoginService(logger, challengeManagerMock, userProviderMock, tokenGeneratorMock, tokenValidatorMock, refreshTokenManagerMock, 0, 0)
 
 			access, refresh, err := service.Verify(ctx, nickname, tt.signature)
 
@@ -125,7 +124,6 @@ func TestLoginService_Refresh(t *testing.T) {
 		nickname   *string
 		setupMocks func(
 			tv *mocks.MockTokenValidator,
-			upByID *mocks.MockUserProviderByID,
 			up *mocks.MockUserProvider,
 			rtm *mocks.MockRefreshTokenManager,
 			tg *mocks.MockTokenGenerator,
@@ -138,9 +136,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "successful refresh with user ID in token",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(user, nil).Once()
+				up.On("GetByID", ctx, userID).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return(refreshToken, nil).Once()
 				tg.On("Generate", *user).Return(newAccessToken, newRefreshToken, nil).Once()
 				rtm.On("SaveRefreshToken", ctx, userID.String(), newRefreshToken, time.Duration(0)).Return(nil).Once()
@@ -152,7 +150,7 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "successful refresh with nickname provided",
 			token:    refreshToken,
 			nickname: &nickname,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return("", nil).Once()
 				up.On("Get", ctx, nickname).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return(refreshToken, nil).Once()
@@ -166,7 +164,7 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "invalid refresh token",
 			token:    "invalid_token",
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", "invalid_token").Return("", errors.New("invalid token")).Once()
 			},
 			expectErr:   true,
@@ -176,7 +174,7 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "no user ID in token and no nickname provided",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return("", nil).Once()
 			},
 			expectErr:   true,
@@ -186,9 +184,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "user not found by ID",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(nil, domain.ErrUserNotFound).Once()
+				up.On("GetByID", ctx, userID).Return(nil, domain.ErrUserNotFound).Once()
 			},
 			expectErr:   true,
 			expectErrIs: domain.ErrUserNotFound,
@@ -197,7 +195,7 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "user not found by nickname",
 			token:    refreshToken,
 			nickname: &nickname,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return("", nil).Once()
 				up.On("Get", ctx, nickname).Return(nil, domain.ErrUserNotFound).Once()
 			},
@@ -208,9 +206,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "refresh token mismatch",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(user, nil).Once()
+				up.On("GetByID", ctx, userID).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return("different_token", nil).Once()
 			},
 			expectErr:   true,
@@ -220,9 +218,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "stored refresh token not found",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(user, nil).Once()
+				up.On("GetByID", ctx, userID).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return("", domain.ErrRefreshTokenNotFound).Once()
 			},
 			expectErr:   true,
@@ -232,9 +230,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "error generating new tokens",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(user, nil).Once()
+				up.On("GetByID", ctx, userID).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return(refreshToken, nil).Once()
 				tg.On("Generate", *user).Return("", "", errors.New("token generation error")).Once()
 			},
@@ -244,9 +242,9 @@ func TestLoginService_Refresh(t *testing.T) {
 			name:     "error saving new refresh token",
 			token:    refreshToken,
 			nickname: nil,
-			setupMocks: func(tv *mocks.MockTokenValidator, upByID *mocks.MockUserProviderByID, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
+			setupMocks: func(tv *mocks.MockTokenValidator, up *mocks.MockUserProvider, rtm *mocks.MockRefreshTokenManager, tg *mocks.MockTokenGenerator) {
 				tv.On("ValidateRefreshToken", refreshToken).Return(userID.String(), nil).Once()
-				upByID.On("GetByID", ctx, userID.String()).Return(user, nil).Once()
+				up.On("GetByID", ctx, userID).Return(user, nil).Once()
 				rtm.On("GetRefreshToken", ctx, userID.String()).Return(refreshToken, nil).Once()
 				tg.On("Generate", *user).Return(newAccessToken, newRefreshToken, nil).Once()
 				rtm.On("SaveRefreshToken", ctx, userID.String(), newRefreshToken, time.Duration(0)).Return(errors.New("save error")).Once()
@@ -259,14 +257,13 @@ func TestLoginService_Refresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			challengeManagerMock := mocks.NewMockchallengeManager(t)
 			userProviderMock := mocks.NewMockUserProvider(t)
-			userProviderByIDMock := mocks.NewMockUserProviderByID(t)
 			tokenGeneratorMock := mocks.NewMockTokenGenerator(t)
 			tokenValidatorMock := mocks.NewMockTokenValidator(t)
 			refreshTokenManagerMock := mocks.NewMockRefreshTokenManager(t)
 
-			tt.setupMocks(tokenValidatorMock, userProviderByIDMock, userProviderMock, refreshTokenManagerMock, tokenGeneratorMock)
+			tt.setupMocks(tokenValidatorMock, userProviderMock, refreshTokenManagerMock, tokenGeneratorMock)
 
-			service := NewLoginService(logger, challengeManagerMock, userProviderMock, userProviderByIDMock, tokenGeneratorMock, tokenValidatorMock, refreshTokenManagerMock, 0, 0)
+			service := NewLoginService(logger, challengeManagerMock, userProviderMock, tokenGeneratorMock, tokenValidatorMock, refreshTokenManagerMock, 0, 0)
 
 			access, refresh, err := service.Refresh(ctx, tt.token, tt.nickname)
 
@@ -287,7 +284,6 @@ func TestLoginService_Refresh(t *testing.T) {
 			}
 
 			tokenValidatorMock.AssertExpectations(t)
-			userProviderByIDMock.AssertExpectations(t)
 			userProviderMock.AssertExpectations(t)
 			refreshTokenManagerMock.AssertExpectations(t)
 			tokenGeneratorMock.AssertExpectations(t)
