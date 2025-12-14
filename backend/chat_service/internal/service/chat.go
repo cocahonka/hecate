@@ -117,3 +117,24 @@ func (s *ChatService) GetEncryptedKey(ctx context.Context, chatID, userID uuid.U
 	}
 	return key, nil
 }
+
+func (s *ChatService) GetChatMembers(ctx context.Context, chatID, userID uuid.UUID) ([]*domain.ChatMember, error) {
+	// 1. Check membership
+	isMember, err := s.memberRepo.IsMember(ctx, chatID, userID)
+	if err != nil {
+		s.logger.Error("failed to check membership", zap.Error(err))
+		return nil, err
+	}
+	if !isMember {
+		return nil, domain.ErrUserNotMember
+	}
+
+	// 2. Get members
+	members, err := s.memberRepo.GetChatMembers(ctx, chatID)
+	if err != nil {
+		s.logger.Error("failed to get chat members", zap.Error(err))
+		return nil, err
+	}
+
+	return members, nil
+}

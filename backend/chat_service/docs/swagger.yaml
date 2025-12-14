@@ -10,6 +10,20 @@ definitions:
         description: Optional, if we implement count
         type: integer
     type: object
+  handlers.ChatMemberResponse:
+    properties:
+      joined_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.ChatMembersResponse:
+    properties:
+      members:
+        items:
+          $ref: '#/definitions/handlers.ChatMemberResponse'
+        type: array
+    type: object
   handlers.ChatResponse:
     properties:
       created_at:
@@ -265,6 +279,57 @@ paths:
       security:
       - Bearer: []
       summary: Check membership
+      tags:
+      - chats
+  /chats/{id}/members:
+    get:
+      description: Get a list of members for a specific chat
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ChatMembersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get chat members
       tags:
       - chats
 securityDefinitions:

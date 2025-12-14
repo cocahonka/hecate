@@ -212,6 +212,55 @@ func (h *Handler) getEncryptedKey(c *gin.Context) {
 	c.JSON(http.StatusOK, EncryptedKeyResponse{EncryptedKey: key})
 }
 
+// GetChatMembers godoc
+// @Summary      Get chat members
+// @Description  Get a list of members for a specific chat
+// @Tags         chats
+// @Produce      json
+// @Param        id   path      string  true  "Chat ID"
+// @Success      200  {object}  ChatMembersResponse
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Security     Bearer
+// @Router       /chats/{id}/members [get]
+func (h *Handler) getChatMembers(c *gin.Context) {
+	userID, err := getUserId(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	chatID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid chat id"})
+		return
+	}
+
+	members, err := h.service.GetChatMembers(c.Request.Context(), chatID, userID)
+	if err != nil {
+		if err == domain.ErrUserNotMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		if err == domain.ErrChatNotFound { // This error might be returned by the repo, even if the service checks membership first.
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	response := make([]*ChatMemberResponse, len(members))
+	for i, member := range members {
+		response[i] = toChatMemberResponse(member)
+	}
+
+	c.JSON(http.StatusOK, ChatMembersResponse{Members: response})
+}
+
 func getUserId(c *gin.Context) (uuid.UUID, error) {
 	idStr, exists := c.Get(userCtx)
 	if !exists {
@@ -225,5 +274,12 @@ func toChatResponse(chat *domain.Chat) *ChatResponse {
 		ID:        chat.ID,
 		CreatedAt: chat.CreatedAt,
 		UpdatedAt: chat.UpdatedAt,
+	}
+}
+
+func toChatMemberResponse(member *domain.ChatMember) *ChatMemberResponse {
+	return &ChatMemberResponse{
+		UserID:   member.UserID,
+		JoinedAt: member.JoinedAt,
 	}
 }

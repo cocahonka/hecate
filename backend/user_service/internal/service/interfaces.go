@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
+	"github.com/google/uuid"
 )
 
 //go:generate mockery
@@ -26,6 +27,7 @@ type UserSaver interface {
 // UserProvider defines the interface for retrieving user data.
 type UserProvider interface {
 	Get(ctx context.Context, nickname string) (*domain.User, error)
+	GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 }
 
 // TokenGenerator defines the interface for generating access and refresh tokens.
@@ -43,9 +45,4 @@ type RefreshTokenManager interface {
 	SaveRefreshToken(ctx context.Context, userID, refreshToken string, ttl time.Duration) error
 	GetRefreshToken(ctx context.Context, userID string) (string, error)
 	DeleteRefreshToken(ctx context.Context, userID string) error
-}
-
-// UserProviderByID defines the interface for retrieving user data by ID.
-type UserProviderByID interface {
-	GetByID(ctx context.Context, userID string) (*domain.User, error)
 }

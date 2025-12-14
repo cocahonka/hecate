@@ -7,6 +7,7 @@ import (
 
 	"github.com/cocahonka/hecate/backend/user_service/internal/domain"
 	handler "github.com/cocahonka/hecate/backend/user_service/internal/handlers"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -17,7 +18,6 @@ type LoginService struct {
 	logger              *zap.Logger
 	challengeManager    challengeManager
 	userProvider        UserProvider
-	userProviderByID    UserProviderByID
 	tokenGenerator      TokenGenerator
 	tokenValidator      TokenValidator
 	refreshTokenManager RefreshTokenManager
@@ -30,7 +30,6 @@ func NewLoginService(
 	logger *zap.Logger,
 	challengeManager challengeManager,
 	userProvider UserProvider,
-	userProviderByID UserProviderByID,
 	tokenGenerator TokenGenerator,
 	tokenValidator TokenValidator,
 	refreshTokenManager RefreshTokenManager,
@@ -41,7 +40,6 @@ func NewLoginService(
 		logger:              logger,
 		challengeManager:    challengeManager,
 		userProvider:        userProvider,
-		userProviderByID:    userProviderByID,
 		tokenGenerator:      tokenGenerator,
 		tokenValidator:      tokenValidator,
 		refreshTokenManager: refreshTokenManager,
@@ -148,7 +146,12 @@ func (s *LoginService) Refresh(ctx context.Context, refreshToken string, nicknam
 		}
 		userID = user.ID.String()
 	} else {
-		user, err = s.userProviderByID.GetByID(ctx, userID)
+		uid, err := uuid.Parse(userID)
+		if err != nil {
+			log.Error("failed to parse user ID", zap.Error(err))
+			return "", "", err
+		}
+		user, err = s.userProvider.GetByID(ctx, uid)
 		if err != nil {
 			log.Error("failed to get user by ID", zap.Error(err))
 			return "", "", err
