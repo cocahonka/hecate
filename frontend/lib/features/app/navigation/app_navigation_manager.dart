@@ -27,7 +27,7 @@ final class AppNavigationManagerImpl implements AppNavigationManager {
   @override
   final ValueNotifier<AppNavigationState> controller = ValueNotifier(
     [
-      HomePage(),
+      ChatsPage(),
     ],
   );
 

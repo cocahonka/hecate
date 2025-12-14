@@ -56,6 +56,7 @@ class _LoginScreenState extends State<_LoginScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
+          duration: Duration(seconds: 3),
         ),
       );
   }
@@ -91,7 +92,7 @@ class _LoginScreenState extends State<_LoginScreen> {
     AppNavigator.change(
       context,
       (state) => [
-        HomePage(),
+        ChatsPage(),
       ],
     );
   }

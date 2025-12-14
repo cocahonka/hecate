@@ -56,7 +56,10 @@ final class AuthInterceptorImpl extends Interceptor implements AuthInterceptor {
     final isRefreshed = await _repository.refreshTokens();
     if (!isRefreshed) {
       await _repository.clearSession();
-      await _stateManager.setUnauthenticated();
+      final nickname = _stateManager.state.nickname;
+      await _stateManager.setUnauthenticated(
+        nickname: nickname,
+      );
       handler.next(err);
       return;
     }

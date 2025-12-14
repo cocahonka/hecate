@@ -1,29 +1,28 @@
 abstract interface class AuthApiPaths {
-  String get initLogin;
+  String get initLoginPath;
 
-  String get verifyLogin;
+  String get verifyLoginPath;
 
-  String get initRegister;
+  String get initRegisterPath;
 
-  String get verifyRegister;
+  String get verifyRegisterPath;
 
-  String get refreshToken;
+  String get refreshTokenPath;
 }
 
 final class AuthApiPathsImpl implements AuthApiPaths {
   @override
-  String get initLogin => const String.fromEnvironment('API_INIT_LOGIN');
+  String get initLoginPath => 'user/login/init';
 
   @override
-  String get verifyLogin => const String.fromEnvironment('API_VERIFY_LOGIN');
+  String get verifyLoginPath => 'user/login/verify';
 
   @override
-  String get initRegister => const String.fromEnvironment('API_INIT_REGISTER');
+  String get initRegisterPath => 'user/register/init';
 
   @override
-  String get verifyRegister =>
-      const String.fromEnvironment('API_VERIFY_REGISTER');
+  String get verifyRegisterPath => 'user/register/verify';
 
   @override
-  String get refreshToken => const String.fromEnvironment('API_REFRESH_TOKEN');
+  String get refreshTokenPath => 'user/login/refresh';
 }

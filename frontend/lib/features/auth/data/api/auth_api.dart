@@ -45,7 +45,7 @@ final class AuthApiImpl implements AuthApi {
     required String nickname,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
-      _paths.initLogin,
+      _paths.initLoginPath,
       data: {
         'nickname': nickname,
       },
@@ -60,7 +60,7 @@ final class AuthApiImpl implements AuthApi {
     required String signature,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
-      _paths.verifyLogin,
+      _paths.verifyLoginPath,
       data: {
         'nickname': nickname,
         'signature': signature,
@@ -75,7 +75,7 @@ final class AuthApiImpl implements AuthApi {
     required String nickname,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
-      _paths.initRegister,
+      _paths.initRegisterPath,
       data: {
         'nickname': nickname,
       },
@@ -92,7 +92,7 @@ final class AuthApiImpl implements AuthApi {
     required String signedChallenge,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
-      _paths.verifyRegister,
+      _paths.verifyRegisterPath,
       data: {
         'nickname': nickname,
         'pub9c': pub9c,
@@ -110,7 +110,7 @@ final class AuthApiImpl implements AuthApi {
     required String nickname,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
-      _paths.refreshToken,
+      _paths.refreshTokenPath,
       data: {
         'refresh_token': refreshToken,
         'nickname': nickname,

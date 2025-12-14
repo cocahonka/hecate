@@ -3,8 +3,8 @@ import 'package:hecate/features/app/di/app_scope.dart';
 import 'package:l/l.dart';
 import 'package:yx_scope_flutter/yx_scope_flutter.dart';
 
-class HomeScreen extends StatelessWidget {
-  HomeScreen({super.key});
+class ChatsScreen extends StatelessWidget {
+  ChatsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +12,7 @@ class HomeScreen extends StatelessWidget {
       builder: (context, scope) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Home'),
+            title: Text('Chats'),
           ),
           body: Center(
             child: ElevatedButton(

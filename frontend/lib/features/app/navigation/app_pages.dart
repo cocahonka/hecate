@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hecate/features/auth/presentation/screens/login_screen.dart';
 import 'package:hecate/features/auth/presentation/screens/register_screen.dart';
-import 'package:hecate/features/home/presentation/screens/home_screen.dart';
+import 'package:hecate/features/chats/presentation/screens/chats_page.dart';
+import 'package:hecate/features/chats/presentation/screens/chats_screen.dart';
 
 @immutable
 sealed class AppPage extends MaterialPage<void> {
@@ -32,21 +33,6 @@ enum AppPageTag {
   needAuth,
 }
 
-final class HomePage extends AppPage {
-  HomePage()
-    : super(
-        name: 'home',
-        arguments: null,
-        child: HomeScreen(),
-        key: ValueKey('home'),
-      );
-
-  @override
-  Set<String> get tags => {
-    AppPageTag.needAuth.name,
-  };
-}
-
 final class LoginPage extends AppPage {
   LoginPage()
     : super(
@@ -71,4 +57,39 @@ final class RegisterPage extends AppPage {
 
   @override
   Set<String> get tags => const {};
+}
+
+final class ChatsPage extends AppPage {
+  ChatsPage()
+    : super(
+        name: 'chats',
+        arguments: null,
+        child: ChatsScreen(),
+        key: ValueKey('home'),
+      );
+
+  @override
+  Set<String> get tags => {
+    AppPageTag.needAuth.name,
+  };
+}
+
+final class SingleChatPage extends AppPage {
+  SingleChatPage({
+    required String chatId,
+  }) : super(
+         name: 'single_chat',
+         arguments: {
+           'chatId': chatId,
+         },
+         child: ChatPage(
+           chatId: chatId,
+         ),
+         key: ValueKey('single_chat'),
+       );
+
+  @override
+  Set<String> get tags => {
+    AppPageTag.needAuth.name,
+  };
 }
