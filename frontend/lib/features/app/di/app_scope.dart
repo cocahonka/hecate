@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:hecate/core/prefs_provider.dart';
-import 'package:hecate/features/app/navigation/app_navigation_revalidator.dart';
 import 'package:hecate/features/app/navigation/di/navigation_scope.dart';
 import 'package:hecate/features/auth/di/auth_scope.dart';
 import 'package:hecate/features/bindings/di/bindings_scope.dart';
+import 'package:hecate/features/chats/di/chats_scope.dart';
 import 'package:yx_scope/yx_scope.dart';
 
 abstract interface class AppScope implements Scope {
@@ -16,6 +16,8 @@ abstract interface class AppScope implements Scope {
   Dio get dio;
 
   PrefsProvider get prefs;
+
+  ChatsScopeHolder get chatsScopeHolder;
 }
 
 final class AppScopeContainer extends ScopeContainer
@@ -54,6 +56,10 @@ final class AppScopeContainer extends ScopeContainer
     () => NavigationScopeModule(this),
   );
 
+  late final chatsScopeHolderDep = dep(
+    () => ChatsScopeHolder(this),
+  );
+
   late final dioDep = dep(
     () =>
         Dio(
@@ -86,8 +92,7 @@ final class AppScopeContainer extends ScopeContainer
   PrefsProvider get prefs => prefsDep.get;
 
   @override
-  AppNavigationRevalidator get navigationRevalidator =>
-      navigationScopeHolderDep.get.revalidator;
+  ChatsScopeHolder get chatsScopeHolder => chatsScopeHolderDep.get;
 }
 
 final class AppScopeHolder

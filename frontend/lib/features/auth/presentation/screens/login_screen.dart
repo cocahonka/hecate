@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hecate/features/app/di/app_scope.dart';
 import 'package:hecate/features/app/navigation/app_navigator.dart';
 import 'package:hecate/features/app/navigation/app_pages.dart';
+import 'package:hecate/features/auth/di/auth_scope.dart';
 import 'package:hecate/features/auth/presentation/widgets/nickname_field.dart';
 import 'package:hecate/features/auth/presentation/widgets/pin_code_field.dart';
 import 'package:yx_scope_flutter/yx_scope_flutter.dart';
@@ -13,14 +14,14 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScopeBuilder<AppScope>.withPlaceholder(
       builder: (context, scope) {
-        return _LoginScreen(scope: scope);
+        return _LoginScreen(scope: scope.auth);
       },
     );
   }
 }
 
 class _LoginScreen extends StatefulWidget {
-  final AppScope scope;
+  final AuthScope scope;
 
   _LoginScreen({
     required this.scope,
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<_LoginScreen> {
   void initState() {
     super.initState();
     nicknameController = TextEditingController(
-      text: widget.scope.auth.stateReadable.state.nickname,
+      text: widget.scope.stateReadable.state.nickname,
     );
     pinController = TextEditingController();
   }
@@ -74,7 +75,7 @@ class _LoginScreenState extends State<_LoginScreen> {
     final pinTrimmed = pin.trim();
 
     try {
-      await widget.scope.auth.interactor.login(
+      await widget.scope.interactor.login(
         nickname: nicknameTrimmed,
         pin: pinTrimmed,
       );

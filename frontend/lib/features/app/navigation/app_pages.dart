@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hecate/features/auth/presentation/screens/login_screen.dart';
 import 'package:hecate/features/auth/presentation/screens/register_screen.dart';
-import 'package:hecate/features/chats/presentation/screens/chats_page.dart';
 import 'package:hecate/features/chats/presentation/screens/chats_screen.dart';
+import 'package:hecate/features/chats/presentation/screens/single_chat_screen.dart';
 
 @immutable
 sealed class AppPage extends MaterialPage<void> {
@@ -82,7 +82,7 @@ final class SingleChatPage extends AppPage {
          arguments: {
            'chatId': chatId,
          },
-         child: ChatPage(
+         child: SingleChatScreen(
            chatId: chatId,
          ),
          key: ValueKey('single_chat'),

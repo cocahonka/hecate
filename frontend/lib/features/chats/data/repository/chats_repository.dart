@@ -9,7 +9,9 @@ import 'package:hecate/features/chats/domain/models/chat.dart';
 import 'package:hecate/features/chats/domain/models/message.dart';
 
 abstract interface class ChatsRepository {
-  Future<List<Chat>> getUserChats();
+  Future<List<Chat>> getUserChats({
+    required String myNickname,
+  });
 
   Future<String> getParticipantPk9dPem({
     required String participantNickname,
@@ -17,6 +19,7 @@ abstract interface class ChatsRepository {
 
   Future<Chat> createChat({
     required String participantNickname,
+    required String myNickname,
     required AesEncryptedKeys encryptedKeys,
   });
 
@@ -49,13 +52,16 @@ final class ChatsRepositoryImpl implements ChatsRepository {
        _chatsStorage = chatsStorage;
 
   @override
-  Future<List<Chat>> getUserChats() async {
+  Future<List<Chat>> getUserChats({
+    required String myNickname,
+  }) async {
     final chatsResponse = await _chatsApi.getUserChats();
 
     final chats = <Chat>[];
     for (final chatResponse in chatsResponse.chats) {
       final participantNickname = await _chatsStorage
           .readParticipantNicknameByChatId(
+            myNickname: myNickname,
             chatId: chatResponse.id,
           );
 
@@ -99,6 +105,7 @@ final class ChatsRepositoryImpl implements ChatsRepository {
 
   @override
   Future<Chat> createChat({
+    required String myNickname,
     required String participantNickname,
     required AesEncryptedKeys encryptedKeys,
   }) async {
@@ -110,6 +117,12 @@ final class ChatsRepositoryImpl implements ChatsRepository {
       participantId: participantIdResponse.id,
       myEncryptedKey: encryptedKeys.myEncryptedKey,
       participantEncryptedKey: encryptedKeys.participantEncryptedKey,
+    );
+
+    await _chatsStorage.saveParticipantNicknameByChatId(
+      myNickname: myNickname,
+      chatId: chat.id,
+      participantNickname: participantNickname,
     );
 
     return Chat(
@@ -130,6 +143,7 @@ final class ChatsRepositoryImpl implements ChatsRepository {
   }) async {
     final participantNickname = await _chatsStorage
         .readParticipantNicknameByChatId(
+          myNickname: myNickname,
           chatId: chatId,
         );
 

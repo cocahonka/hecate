@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hecate/core/prefs_provider.dart';
-import 'package:hecate/features/app/navigation/app_navigation_revalidator.dart';
+import 'package:hecate/features/app/navigation/di/navigation_scope.dart';
 import 'package:hecate/features/auth/data/api/auth_api.dart';
 import 'package:hecate/features/auth/data/api/auth_api_paths.dart';
 import 'package:hecate/features/auth/data/repository/auth_repository.dart';
@@ -16,6 +16,8 @@ import 'package:yx_scope/yx_scope.dart';
 import 'package:yx_state/yx_state.dart';
 
 abstract interface class AuthScope {
+  AuthStateManager get stateManager;
+
   StateReadable<AuthState> get stateReadable;
 
   AuthInteractor get interactor;
@@ -28,7 +30,7 @@ abstract interface class AuthParentScope extends ScopeContainer {
 
   BindingsScope get bindings;
 
-  AppNavigationRevalidator get navigationRevalidator;
+  NavigationScope get navigation;
 }
 
 final class AuthScopeModule<ParentScopeContainer extends AuthParentScope>
@@ -90,9 +92,12 @@ final class AuthScopeModule<ParentScopeContainer extends AuthParentScope>
       authStateManager: stateManagerDep.get,
       dio: container.dio,
       refreshInterceptor: interceptorDep.get,
-      navigationRevalidator: container.navigationRevalidator,
+      navigationRevalidator: container.navigation.revalidator,
     ),
   );
+
+  @override
+  AuthStateManager get stateManager => stateManagerDep.get;
 
   @override
   StateReadable<AuthState> get stateReadable => stateManagerDep.get;

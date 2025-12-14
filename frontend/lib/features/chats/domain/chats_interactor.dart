@@ -73,7 +73,14 @@ final class ChatsInteractorImpl implements ChatsInteractor {
 
       final UnmodifiableListView<Chat> updatedChats;
       try {
-        final chatsResponse = await _repository.getUserChats();
+        final myNickname = _authStateManager.state.nickname;
+        if (myNickname == null) {
+          throw StateError('My nickname is null');
+        }
+
+        final chatsResponse = await _repository.getUserChats(
+          myNickname: myNickname,
+        );
         final currentChats = _stateManager.state.chats;
         final currentChatsById = {
           for (final chat in currentChats) chat.id: chat,
@@ -117,6 +124,15 @@ final class ChatsInteractorImpl implements ChatsInteractor {
     required String participantNickname,
   }) async => _lock.synchronized(
     () async {
+      final myNickname = _authStateManager.state.nickname;
+
+      if (myNickname == null) {
+        l.w(
+          'Failed to update messages - myNickname is null',
+        );
+        return;
+      }
+
       final currentChats = _stateManager.state.chats;
       if (currentChats.any(
         (chat) => chat.participantNickname == participantNickname,
@@ -139,6 +155,7 @@ final class ChatsInteractorImpl implements ChatsInteractor {
       }
 
       final chat = await _repository.createChat(
+        myNickname: myNickname,
         participantNickname: participantNickname,
         encryptedKeys: encryptedKeys,
       );

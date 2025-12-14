@@ -376,7 +376,24 @@ final class BindingsInteractorImpl implements BindingsInteractor {
 }
 
 extension _Base64Extension on String {
-  String get plaintextFromBase64url => utf8.decode(base64Url.decode(this));
+  /// Decodes base64url *without padding* into a UTF-8 string.
+  String get plaintextFromBase64url {
+    var normalized = this;
 
-  String get base64urlFromPlaintext => base64Url.encode(utf8.encode(this));
+    // Go bindings use RawURLEncoding (no padding), а Dart ожидает правильную кратность 4.
+    final remainder = normalized.length % 4;
+    if (remainder == 2) {
+      normalized += '==';
+    } else if (remainder == 3) {
+      normalized += '=';
+    }
+
+    return utf8.decode(base64Url.decode(normalized));
+  }
+
+  /// Encodes UTF-8 строку в base64url *без padding* (совместимо с Go RawURLEncoding).
+  String get base64urlFromPlaintext {
+    final encoded = base64Url.encode(utf8.encode(this));
+    return encoded.replaceAll('=', '');
+  }
 }

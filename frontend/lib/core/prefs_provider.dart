@@ -13,6 +13,9 @@ final class PrefsProviderImpl implements PrefsProvider {
 
   @override
   Future<void> init() async {
+    SharedPreferences.setPrefix(
+      const String.fromEnvironment('SHARED_PREFS_PREFIX'),
+    );
     _prefs = await SharedPreferences.getInstance();
   }
 

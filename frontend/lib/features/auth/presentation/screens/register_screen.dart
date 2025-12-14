@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hecate/features/app/di/app_scope.dart';
 import 'package:hecate/features/app/navigation/app_navigator.dart';
 import 'package:hecate/features/app/navigation/app_pages.dart';
+import 'package:hecate/features/auth/di/auth_scope.dart';
 import 'package:hecate/features/auth/presentation/widgets/nickname_field.dart';
 import 'package:hecate/features/auth/presentation/widgets/pin_code_field.dart';
 import 'package:yx_scope_flutter/yx_scope_flutter.dart';
@@ -13,14 +14,14 @@ class RegisterScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScopeBuilder<AppScope>.withPlaceholder(
       builder: (context, scope) {
-        return _RegisterScreen(scope: scope);
+        return _RegisterScreen(scope: scope.auth);
       },
     );
   }
 }
 
 class _RegisterScreen extends StatefulWidget {
-  final AppScope scope;
+  final AuthScope scope;
 
   _RegisterScreen({
     required this.scope,
@@ -63,10 +64,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
     final nickname = nicknameController.text;
     final pin = pinController.text;
 
-    if (nickname.isEmpty ||
-        pin.isEmpty ||
-        nickname.trim() != nickname ||
-        pin.trim() != pin) {
+    if (nickname.isEmpty || nickname.trim() != nickname || pin.trim() != pin) {
       _showSnackBar('Please fill in all fields and remove spaces');
       return;
     }
@@ -76,7 +74,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
 
     final bool success;
     try {
-      success = await widget.scope.auth.interactor.register(
+      success = await widget.scope.interactor.register(
         nickname: nicknameTrimmed,
         pin: pinTrimmed,
       );

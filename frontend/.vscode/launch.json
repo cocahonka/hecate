@@ -2,6 +2,34 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "First",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "preLaunchTask": "pre-launch-all",
+            "args": [
+                "--dart-define-from-file=.env.first"
+            ],
+            "env": {
+                "PUB_HOSTED_URL": "https://pub.dev",
+            }
+        },
+        {
+            "name": "Second",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "preLaunchTask": "pre-launch-all",
+            "args": [
+                "--dart-define-from-file=.env.second"
+            ],
+            "env": {
+                "PUB_HOSTED_URL": "https://pub.dev",
+            }
+        },
+        {
             "name": "Flutter: Debug",
             "cwd": "${workspaceFolder}",
             "program": "${workspaceFolder}/lib/main.dart",

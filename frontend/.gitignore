@@ -85,6 +85,7 @@ lib/generated_plugin_registrant.dart
 .env.local
 .env.*.local
 .envrc
+.env.*
 
 # Coverage
 coverage/
