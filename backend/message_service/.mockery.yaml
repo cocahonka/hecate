@@ -1,0 +1,17 @@
+all: true
+log-level: info
+structname: "Mock{{.InterfaceName}}"
+recursive: true
+packages:
+  github.com/cocahonka/hecate/backend/message_service/internal/service:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: "{{.InterfaceName}}.go"
+      outpkg: "mocks"
+  github.com/cocahonka/hecate/backend/message_service/internal/repository:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: "{{.InterfaceName}}.go"
+      outpkg: "mocks"
