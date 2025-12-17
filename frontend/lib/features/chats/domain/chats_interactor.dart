@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:hecate/features/app/navigation/app_navigation_manager.dart';
 import 'package:hecate/features/app/navigation/app_pages.dart';
+import 'package:hecate/features/auth/domain/auth_state.dart';
 import 'package:hecate/features/auth/domain/auth_state_manager.dart';
 import 'package:hecate/features/bindings/domain/bindings_interactor.dart';
 import 'package:hecate/features/chats/data/repository/chats_repository.dart';
@@ -32,7 +33,7 @@ abstract interface class ChatsInteractor implements AsyncLifecycle {
 
   Future<void> sendMessage({
     required String chatId,
-    required String message,
+    required String messagePlaintext,
   });
 }
 
@@ -69,42 +70,43 @@ final class ChatsInteractorImpl implements ChatsInteractor {
   @override
   Future<void> updateChatsList() async => _lock.synchronized(
     () async {
+      final authState = _authStateManager.state;
+      if (authState is! AuthState$Authenticated) {
+        return;
+      }
+
+      final currentChats = _stateManager.state.chats;
+      final currentChatsById = {
+        for (final chat in currentChats) chat.id: chat,
+      };
+
       await _stateManager.setLoading();
 
       final UnmodifiableListView<Chat> updatedChats;
       try {
-        final myNickname = _authStateManager.state.nickname;
-        if (myNickname == null) {
-          throw StateError('My nickname is null');
-        }
-
-        final chatsResponse = await _repository.getUserChats(
+        final myNickname = authState.nickname;
+        final fetchedChatsWithoutMessages = await _repository.getUserChats(
           myNickname: myNickname,
         );
-        final currentChats = _stateManager.state.chats;
-        final currentChatsById = {
-          for (final chat in currentChats) chat.id: chat,
-        };
 
         updatedChats = UnmodifiableListView(
-          chatsResponse.map(
-            (chatResponse) {
-              final currentChat = currentChatsById[chatResponse.id];
+          fetchedChatsWithoutMessages.map(
+            (fetchedChat) {
+              final currentChat = currentChatsById[fetchedChat.id];
 
               return Chat(
-                id: chatResponse.id,
-                participantId: chatResponse.participantId,
-                participantNickname: chatResponse.participantNickname,
-                encryptedKey: chatResponse.encryptedKey,
+                id: fetchedChat.id,
+                participantId: fetchedChat.participantId,
+                participantNickname: fetchedChat.participantNickname,
+                encryptedKey: fetchedChat.encryptedKey,
                 messages: currentChat?.messages ?? UnmodifiableListView([]),
-                createdAt: chatResponse.createdAt,
-                updatedAt: chatResponse.updatedAt,
+                createdAt: fetchedChat.createdAt,
+                updatedAt: fetchedChat.updatedAt,
               );
             },
           ),
         );
       } on Object catch (error, stackTrace) {
-        // todo add popup error message
         await _stateManager.setError(
           consequence: 'Failed to update chats list',
           error: error,
@@ -124,48 +126,56 @@ final class ChatsInteractorImpl implements ChatsInteractor {
     required String participantNickname,
   }) async => _lock.synchronized(
     () async {
-      final myNickname = _authStateManager.state.nickname;
+      final currentChats = _stateManager.state.chats;
 
-      if (myNickname == null) {
-        l.w(
-          'Failed to update messages - myNickname is null',
+      if (currentChats.any(
+        (chat) => chat.participantNickname == participantNickname,
+      )) {
+        await _stateManager.setError(
+          consequence: 'Chat already exists',
+          error: null,
+          stackTrace: null,
         );
         return;
       }
 
-      final currentChats = _stateManager.state.chats;
-      if (currentChats.any(
-        (chat) => chat.participantNickname == participantNickname,
-      )) {
-        // todo add popup info message
+      try {
+        final participantPk9dPem = await _repository.getParticipantPk9dPem(
+          participantNickname: participantNickname,
+        );
+
+        final encryptedKeys = await _bindingsInteractor.generateEncryptedKeys(
+          participantPk9dPem: participantPk9dPem,
+        );
+
+        if (encryptedKeys == null) {
+          await _stateManager.setError(
+            consequence: 'Failed to generate encrypted keys',
+            error: null,
+            stackTrace: null,
+          );
+          return;
+        }
+
+        final chat = await _repository.createChat(
+          participantNickname: participantNickname,
+          encryptedKeys: encryptedKeys,
+        );
+
+        await _stateManager.setIdle(
+          chats: UnmodifiableListView([
+            ...currentChats,
+            chat,
+          ]),
+        );
+      } on Object catch (error, stackTrace) {
+        await _stateManager.setError(
+          consequence: 'Failed to create chat',
+          error: error,
+          stackTrace: stackTrace,
+        );
         return;
       }
-
-      final participantPk9dPem = await _repository.getParticipantPk9dPem(
-        participantNickname: participantNickname,
-      );
-
-      final encryptedKeys = await _bindingsInteractor.generateEncryptedKeys(
-        participantPk9dPem: participantPk9dPem,
-      );
-
-      if (encryptedKeys == null) {
-        // todo add popup error message
-        return;
-      }
-
-      final chat = await _repository.createChat(
-        myNickname: myNickname,
-        participantNickname: participantNickname,
-        encryptedKeys: encryptedKeys,
-      );
-
-      await _stateManager.setIdle(
-        chats: UnmodifiableListView([
-          ...currentChats,
-          chat,
-        ]),
-      );
     },
   );
 
@@ -209,15 +219,12 @@ final class ChatsInteractorImpl implements ChatsInteractor {
     required String chatId,
   }) async => _lock.synchronized(
     () async {
-      final myNickname = _authStateManager.state.nickname;
-
-      if (myNickname == null) {
-        l.w(
-          'Failed to update messages - myNickname is null',
-        );
+      final authState = _authStateManager.state;
+      if (authState is! AuthState$Authenticated) {
         return;
       }
 
+      final myNickname = authState.nickname;
       final currentChats = _stateManager.state.chats;
 
       final chat = currentChats.firstWhereOrNull(
@@ -235,16 +242,15 @@ final class ChatsInteractorImpl implements ChatsInteractor {
         chatId: chatId,
         myNickname: myNickname,
       );
-
       final decryptedMessages = <Message>[];
       for (final encryptedMessage in encryptedMessages) {
-        final decryptedMessage = await _bindingsInteractor.decryptMessage(
+        final decryptedPlaintext = await _bindingsInteractor.decryptMessage(
           myEncryptedKey: chat.encryptedKey,
           encryptedMessage: encryptedMessage.content,
           pin: null,
         );
 
-        if (decryptedMessage == null) {
+        if (decryptedPlaintext == null) {
           l.w(
             'Failed to decrypt message - chatId: $chatId, messageId: ${encryptedMessage.id}',
           );
@@ -253,7 +259,7 @@ final class ChatsInteractorImpl implements ChatsInteractor {
 
         decryptedMessages.add(
           encryptedMessage.copyWith(
-            content: decryptedMessage,
+            content: decryptedPlaintext,
           ),
         );
       }
@@ -274,18 +280,15 @@ final class ChatsInteractorImpl implements ChatsInteractor {
   @override
   Future<void> sendMessage({
     required String chatId,
-    required String message,
+    required String messagePlaintext,
   }) async => _lock.synchronized(
     () async {
-      final myNickname = _authStateManager.state.nickname;
-
-      if (myNickname == null) {
-        l.w(
-          'Failed to send message - myNickname is null',
-        );
+      final authState = _authStateManager.state;
+      if (authState is! AuthState$Authenticated) {
         return;
       }
 
+      final myNickname = authState.nickname;
       final currentChats = _stateManager.state.chats;
       final chat = currentChats.firstWhereOrNull(
         (chat) => chat.id == chatId,
@@ -300,13 +303,13 @@ final class ChatsInteractorImpl implements ChatsInteractor {
 
       final encryptedPayload = await _bindingsInteractor.encryptMessage(
         myEncryptedKey: chat.encryptedKey,
-        plaintext: message,
+        plaintext: messagePlaintext,
         pin: null,
       );
 
       if (encryptedPayload == null) {
         l.w(
-          'Failed to encrypt message - chatId: $chatId, message: $message',
+          'Failed to encrypt message - chatId: $chatId, message: $messagePlaintext',
         );
         return;
       }
@@ -325,7 +328,7 @@ final class ChatsInteractorImpl implements ChatsInteractor {
 
       if (decryptedMessage == null) {
         l.w(
-          'Failed to decrypt message - chatId: $chatId, message: $message',
+          'Failed to decrypt message - chatId: $chatId, message: $messagePlaintext',
         );
         return;
       }
@@ -333,10 +336,10 @@ final class ChatsInteractorImpl implements ChatsInteractor {
       final updatedChat = chat.copyWith(
         messages: UnmodifiableListView(
           [
-            ...chat.messages,
             encryptedMessage.copyWith(
               content: decryptedMessage,
             ),
+            ...chat.messages,
           ],
         ),
       );

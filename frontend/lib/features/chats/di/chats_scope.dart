@@ -6,7 +6,6 @@ import 'package:hecate/features/chats/data/api/messages/messages_api_paths.dart'
 import 'package:hecate/features/chats/data/api/users/users_api.dart';
 import 'package:hecate/features/chats/data/api/users/users_api_paths.dart';
 import 'package:hecate/features/chats/data/repository/chats_repository.dart';
-import 'package:hecate/features/chats/data/storage/chats/chats_storage.dart';
 import 'package:hecate/features/chats/domain/chats_interactor.dart';
 import 'package:hecate/features/chats/domain/chats_state.dart';
 import 'package:hecate/features/chats/domain/chats_state_manager.dart';
@@ -70,20 +69,12 @@ final class ChatsScopeContainer extends ChildScopeContainer<AppScope>
     ),
   );
 
-  // Storage
-  late final _chatsStorageDep = dep<ChatsStorage>(
-    () => ChatsStorageImpl(
-      prefs: parent.prefs.prefs,
-    ),
-  );
-
   // Repository
   late final _repositoryDep = dep<ChatsRepository>(
     () => ChatsRepositoryImpl(
       chatsApi: _chatsApiDep.get,
       messagesApi: _messagesApiDep.get,
       usersApi: _usersApiDep.get,
-      chatsStorage: _chatsStorageDep.get,
     ),
   );
 

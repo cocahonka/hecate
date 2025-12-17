@@ -82,7 +82,7 @@ class _SingleChatScreenState extends State<_SingleChatScreen> {
           ChatMessageInput(
             onSend: (text) => interactor.sendMessage(
               chatId: widget.chatId,
-              message: text,
+              messagePlaintext: text,
             ),
           ),
         ],

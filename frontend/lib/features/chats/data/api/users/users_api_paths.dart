@@ -1,8 +1,14 @@
 abstract interface class UsersApiPaths {
-  String userByNicknamePath(String nickname);
+  String userInfoByNicknamePath(String nickname);
+
+  String userInfoByIdPath(String id);
 }
 
 final class UsersApiPathsImpl implements UsersApiPaths {
   @override
-  String userByNicknamePath(String nickname) => 'api/v1/user/user/$nickname';
+  String userInfoByNicknamePath(String nickname) =>
+      'api/v1/user/user/$nickname';
+
+  @override
+  String userInfoByIdPath(String id) => 'api/v1/user/user/id/$id';
 }

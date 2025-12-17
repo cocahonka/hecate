@@ -8,6 +8,8 @@ abstract interface class ChatsApiPaths {
   String encryptedKeyPath(String id);
 
   String checkMembershipPath(String id);
+
+  String chatMembersPath(String id);
 }
 
 final class ChatsApiPathsImpl implements ChatsApiPaths {
@@ -25,4 +27,7 @@ final class ChatsApiPathsImpl implements ChatsApiPaths {
 
   @override
   String checkMembershipPath(String chatId) => 'api/v1/chats/$chatId/member';
+
+  @override
+  String chatMembersPath(String chatId) => 'api/v1/chats/$chatId/members';
 }

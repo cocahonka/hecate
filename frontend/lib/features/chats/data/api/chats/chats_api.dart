@@ -26,6 +26,10 @@ abstract interface class ChatsApi {
   Future<EncryptedKeyResponse> getEncryptedKey({
     required String chatId,
   });
+
+  Future<ChatMembersResponse> getChatMembers({
+    required String chatId,
+  });
 }
 
 final class ChatsApiImpl implements ChatsApi {
@@ -103,5 +107,16 @@ final class ChatsApiImpl implements ChatsApi {
     );
     final data = response.data!;
     return EncryptedKeyResponse.fromJson(data);
+  }
+
+  @override
+  Future<ChatMembersResponse> getChatMembers({
+    required String chatId,
+  }) async {
+    final response = await _dio.get<Map<String, Object?>>(
+      _paths.chatMembersPath(chatId),
+    );
+    final data = response.data!;
+    return ChatMembersResponse.fromJson(data);
   }
 }

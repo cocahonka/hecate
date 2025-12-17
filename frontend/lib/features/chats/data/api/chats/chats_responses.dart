@@ -89,3 +89,50 @@ final class EncryptedKeyResponse {
         _ => throw FormatException('Invalid EncryptedKeyResponse: $json'),
       };
 }
+
+@immutable
+final class ChatMembersResponse {
+  final List<ChatMemberResponse> members;
+
+  ChatMembersResponse({
+    required this.members,
+  });
+
+  factory ChatMembersResponse.fromJson(Map<String, Object?> json) =>
+      switch (json) {
+        {
+          'members': final List<Object?> membersJson,
+        } =>
+          ChatMembersResponse(
+            members: membersJson
+                .cast<Map<String, Object?>>()
+                .map((memberJson) => ChatMemberResponse.fromJson(memberJson))
+                .toList(growable: false),
+          ),
+        _ => throw FormatException('Invalid ChatMembersResponse: $json'),
+      };
+}
+
+@immutable
+final class ChatMemberResponse {
+  final String userId;
+  final DateTime joinedAt;
+
+  ChatMemberResponse({
+    required this.userId,
+    required this.joinedAt,
+  });
+
+  factory ChatMemberResponse.fromJson(Map<String, Object?> json) =>
+      switch (json) {
+        {
+          'user_id': final String userId,
+          'joined_at': final String joinedAt,
+        } =>
+          ChatMemberResponse(
+            userId: userId,
+            joinedAt: DateTime.parse(joinedAt),
+          ),
+        _ => throw FormatException('Invalid ChatMemberResponse: $json'),
+      };
+}
