@@ -12,17 +12,17 @@ abstract interface class AuthApiPaths {
 
 final class AuthApiPathsImpl implements AuthApiPaths {
   @override
-  String get initLoginPath => 'user/login/init';
+  String get initLoginPath => 'api/v1/user/login/init';
 
   @override
-  String get verifyLoginPath => 'user/login/verify';
+  String get verifyLoginPath => 'api/v1/user/login/verify';
 
   @override
-  String get initRegisterPath => 'user/register/init';
+  String get initRegisterPath => 'api/v1/user/register/init';
 
   @override
-  String get verifyRegisterPath => 'user/register/verify';
+  String get verifyRegisterPath => 'api/v1/user/register/verify';
 
   @override
-  String get refreshTokenPath => 'user/login/refresh';
+  String get refreshTokenPath => 'api/v1/user/login/refresh';
 }

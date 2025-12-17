@@ -4,5 +4,5 @@ abstract interface class UsersApiPaths {
 
 final class UsersApiPathsImpl implements UsersApiPaths {
   @override
-  String userByNicknamePath(String nickname) => 'user/user/$nickname';
+  String userByNicknamePath(String nickname) => 'api/v1/user/user/$nickname';
 }
