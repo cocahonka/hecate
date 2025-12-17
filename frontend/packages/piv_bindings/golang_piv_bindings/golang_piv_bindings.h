@@ -49,6 +49,11 @@ go_piv_bindings_status_t go_piv_bindings_device_close(
   go_piv_bindings_handle_t handle
 );
 
+// Close all currently opened device/sessions and release resources.
+// This is a best-effort operation intended primarily for development tooling
+// (e.g. before hot restart); it always returns status.code = 0 (OK).
+go_piv_bindings_status_t go_piv_bindings_device_close_all(void);
+
 // Helper to verify the PIV PIN once per session (allows YubiKey to cache PIN if policy permits).
 // pin_utf8: null-terminated UTF-8 string; never persisted or logged by the implementation.
 // Can be called at startup so subsequent operations do not require passing the PIN explicitly

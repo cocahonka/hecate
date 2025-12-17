@@ -109,6 +109,27 @@ void main() {
         expect(secondClose, isA<PivBindingsStatus$Ok>());
       },
     );
+
+    test(
+      'closeAllDevices closes all active sessions',
+      () {
+        final first = api.openDevice();
+        expect(first.status, isA<PivBindingsStatus$Ok>());
+
+        // With a single YubiKey, the second open should fail with NotPresent.
+        final second = api.openDevice();
+        expect(second.status, isA<PivBindingsStatus$NotPresent>());
+
+        final closedAll = api.closeAllDevices();
+        expect(closedAll, isA<PivBindingsStatus$Ok>());
+
+        final reopened = api.openDevice();
+        expect(reopened.status, isA<PivBindingsStatus$Ok>());
+
+        final closed = api.closeDevice(handle: reopened.handle);
+        expect(closed, isA<PivBindingsStatus$Ok>());
+      },
+    );
   });
 
   group('verifySignature', () {

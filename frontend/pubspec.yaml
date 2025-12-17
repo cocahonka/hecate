@@ -13,7 +13,35 @@ workspace:
 dependencies:
   flutter:
     sdk: flutter
+
+  # workspace packages
   piv_bindings: any
+
+  # framework
+  meta: any
+  collection: any
+
+  # di
+  yx_scope: 1.1.2
+  yx_scope_flutter: 1.1.2
+
+  # state
+  yx_state: 1.0.0
+  yx_state_flutter: 1.0.0
+
+  # storage
+  flutter_secure_storage: 9.2.4
+  shared_preferences: 2.5.3
+
+  # logging
+  l: 5.0.1
+
+  # network
+  dio: 5.9.0
+
+  # utility
+  rxdart: 0.28.0
+  synchronized: 3.4.0
 
 dev_dependencies:
   coca_lints: 1.0.1

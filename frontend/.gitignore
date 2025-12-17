@@ -85,6 +85,7 @@ lib/generated_plugin_registrant.dart
 .env.local
 .env.*.local
 .envrc
+.env.*
 
 # Coverage
 coverage/
@@ -105,6 +106,8 @@ melos_*.yaml
 
 # Junk and drafts
 .junk
+junk.context
+.junk.context
 
 # Cursor related
 .cursorignore

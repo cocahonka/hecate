@@ -95,6 +95,13 @@ abstract interface class PivBindings {
     required BindingsHandle handle,
   });
 
+  /// Close all active device sessions and release resources.
+  ///
+  /// This is a best-effort operation intended primarily for development and
+  /// tooling scenarios (e.g. before a hot restart). It is safe to call even
+  /// when there are no active sessions.
+  PivBindingsStatus closeAllDevices();
+
   /// Optionally authenticate the device with a PIV PIN for the current session.
   ///
   /// Depending on 9c PIN policy, subsequent calls (e.g. [signChallenge]) may
