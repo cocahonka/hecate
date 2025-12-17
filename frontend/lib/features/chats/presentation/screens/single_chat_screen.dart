@@ -8,7 +8,7 @@ import 'package:yx_scope_flutter/yx_scope_flutter.dart';
 class SingleChatScreen extends StatelessWidget {
   final String chatId;
 
-  const SingleChatScreen({
+  SingleChatScreen({
     required this.chatId,
     super.key,
   });
@@ -26,13 +26,13 @@ class SingleChatScreen extends StatelessWidget {
                 chatId: chatId,
               );
             },
-            placeholder: const Center(
+            placeholder: Center(
               child: CircularProgressIndicator(),
             ),
           ),
         );
       },
-      placeholder: const Center(
+      placeholder: Center(
         child: CircularProgressIndicator(),
       ),
     );
@@ -40,13 +40,13 @@ class SingleChatScreen extends StatelessWidget {
 }
 
 class _SingleChatScreen extends StatefulWidget {
-  const _SingleChatScreen({
+  final ChatsScope scope;
+  final String chatId;
+
+  _SingleChatScreen({
     required this.scope,
     required this.chatId,
   });
-
-  final ChatsScope scope;
-  final String chatId;
 
   @override
   State<_SingleChatScreen> createState() => _SingleChatScreenState();
@@ -62,9 +62,9 @@ class _SingleChatScreenState extends State<_SingleChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        title: Text('Chat'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () {
             // ignore: discarded_futures
             interactor.closeChat(chatId: widget.chatId);
@@ -94,7 +94,7 @@ class _SingleChatScreenState extends State<_SingleChatScreen> {
           // ignore: discarded_futures
           interactor.updateMessages(chatId: widget.chatId);
         },
-        child: const Icon(Icons.refresh),
+        child: Icon(Icons.refresh),
       ),
     );
   }

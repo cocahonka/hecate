@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class ChatMessageInput extends StatefulWidget {
-  const ChatMessageInput({
+  final Future<void> Function(String text) onSend;
+
+  ChatMessageInput({
     required this.onSend,
     super.key,
   });
-
-  final Future<void> Function(String text) onSend;
 
   @override
   State<ChatMessageInput> createState() => _ChatMessageInputState();
@@ -35,16 +35,11 @@ class _ChatMessageInputState extends State<ChatMessageInput> {
       return;
     }
 
-    try {
-      await widget.onSend(text);
-      if (!mounted) {
-        return;
-      }
-      _controller.clear();
-    } on Object {
-      // TODO: показать ошибку отправки сообщения (snackbar/toast)
-      rethrow;
+    await widget.onSend(text);
+    if (!mounted) {
+      return;
     }
+    _controller.clear();
   }
 
   @override
@@ -54,17 +49,17 @@ class _ChatMessageInputState extends State<ChatMessageInput> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Row(
           children: [
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant,
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 4,
                   ),
@@ -73,7 +68,7 @@ class _ChatMessageInputState extends State<ChatMessageInput> {
                     minLines: 1,
                     maxLines: 4,
                     textInputAction: TextInputAction.newline,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       border: InputBorder.none,
                       hintText: 'Type a message…',
                     ),
@@ -81,13 +76,13 @@ class _ChatMessageInputState extends State<ChatMessageInput> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             FloatingActionButton.small(
               heroTag: 'send_message_fab',
               onPressed: _handleSend,
-              child: const Icon(Icons.send),
+              child: Icon(Icons.send),
             ),
-            const SizedBox(width: 64),
+            SizedBox(width: 64),
           ],
         ),
       ),

@@ -43,10 +43,8 @@ class _AppWrapperState extends State<AppWrapper> {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: Material(
-                    child: BindingStateBanner(
-                      stateReadable: scope.bindings.stateReadable,
-                    ),
+                  child: BindingStateBanner(
+                    stateReadable: scope.bindings.stateReadable,
                   ),
                 ),
               ],

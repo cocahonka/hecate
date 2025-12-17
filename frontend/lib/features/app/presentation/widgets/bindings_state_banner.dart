@@ -68,41 +68,41 @@ class BindingStateBanner extends StatelessWidget {
           ),
         };
 
-        return DecoratedBox(
-          decoration: ShapeDecoration(
-            color: color.withValues(alpha: 0.8),
-            shape: StadiumBorder(),
-            shadows: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
+        return DefaultTextStyle(
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
           ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: Colors.black87,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
+          child: DecoratedBox(
+            decoration: ShapeDecoration(
+              color: color.withValues(alpha: 0.8),
+              shape: StadiumBorder(),
+              shadows: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: Colors.black87,
+                  ),
+                  SizedBox(width: 8),
+                  Text(label),
+                ],
+              ),
             ),
           ),
         );

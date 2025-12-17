@@ -4,12 +4,12 @@ import 'package:yx_state/yx_state.dart';
 import 'package:yx_state_flutter/yx_state_flutter.dart';
 
 class ChatsStatusBar extends StatelessWidget {
-  const ChatsStatusBar({
+  final StateReadable<ChatsState> stateReadable;
+
+  ChatsStatusBar({
     required this.stateReadable,
     super.key,
   });
-
-  final StateReadable<ChatsState> stateReadable;
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +36,12 @@ class ChatsStatusBar extends StatelessWidget {
           return Container(
             width: double.infinity,
             color: color,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,

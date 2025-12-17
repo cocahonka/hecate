@@ -262,6 +262,10 @@ final class ChatsInteractorImpl implements ChatsInteractor {
             content: decryptedPlaintext,
           ),
         );
+
+        // TODO(cocahonka): remove massive lag when updating messages
+        // add separate single chat state manager
+        await Future<void>.delayed(Duration.zero);
       }
 
       final updatedChat = chat.copyWith(

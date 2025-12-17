@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
 class CreateChatFab extends StatelessWidget {
-  const CreateChatFab({
-    required this.onCreateChat,
-    super.key,
-  });
-
   final Future<void> Function({
     required String participantNickname,
   })
   onCreateChat;
 
+  CreateChatFab({
+    required this.onCreateChat,
+    super.key,
+  });
+
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton.extended(
       onPressed: () => _showCreateChatDialog(context),
-      icon: const Icon(Icons.add_comment),
-      label: const Text('New chat'),
+      icon: Icon(Icons.add_comment),
+      label: Text('New chat'),
     );
   }
 
@@ -29,10 +29,10 @@ class CreateChatFab extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Start new chat'),
+          title: Text('Start new chat'),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Participant nickname',
               hintText: 'Enter nickname',
             ),
@@ -43,11 +43,11 @@ class CreateChatFab extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Create'),
+              child: Text('Create'),
             ),
           ],
         );
@@ -70,27 +70,7 @@ class CreateChatFab extends StatelessWidget {
       return;
     }
 
-    try {
-      await onCreateChat(participantNickname: nickname);
-      if (!context.mounted) {
-        return;
-      }
-      _showSnackBar(
-        context,
-        'Chat with @$nickname created',
-        theme,
-      );
-    } on Object {
-      if (!context.mounted) {
-        return;
-      }
-      _showSnackBar(
-        context,
-        'Failed to create chat with @$nickname',
-        theme,
-      );
-      rethrow;
-    }
+    await onCreateChat(participantNickname: nickname);
   }
 
   void _showSnackBar(

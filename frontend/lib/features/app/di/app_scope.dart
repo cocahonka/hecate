@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:hecate/core/logger_interceptor.dart';
 import 'package:hecate/core/prefs_provider.dart';
 import 'package:hecate/features/app/navigation/di/navigation_scope.dart';
 import 'package:hecate/features/auth/di/auth_scope.dart';
@@ -68,7 +69,7 @@ final class AppScopeContainer extends ScopeContainer
             ),
           )
           ..interceptors.add(
-            LogInterceptor(),
+            LoggerInterceptorImpl(),
           ),
   );
 

@@ -144,7 +144,7 @@ final class ChatsRepositoryImpl implements ChatsRepository {
 
     final messagesResponse = await _messagesApi.getHistory(
       chatId: chatId,
-      limit: 0,
+      limit: 1000,
     );
 
     final messages = <Message>[];

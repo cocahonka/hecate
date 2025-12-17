@@ -5,14 +5,14 @@ import 'package:yx_state/yx_state.dart';
 import 'package:yx_state_flutter/yx_state_flutter.dart';
 
 class ChatsList extends StatelessWidget {
-  const ChatsList({
+  final StateReadable<ChatsState> stateReadable;
+  final void Function(Chat chat) onChatTap;
+
+  ChatsList({
     required this.stateReadable,
     required this.onChatTap,
     super.key,
   });
-
-  final StateReadable<ChatsState> stateReadable;
-  final void Function(Chat chat) onChatTap;
 
   @override
   Widget build(BuildContext context) {
@@ -22,11 +22,11 @@ class ChatsList extends StatelessWidget {
         final chats = state.chats;
 
         if (chats.isEmpty) {
-          return const _EmptyChatsView();
+          return _EmptyChatsView();
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           itemBuilder: (context, index) {
             final chat = chats[index];
             return _ChatTile(
@@ -34,7 +34,7 @@ class ChatsList extends StatelessWidget {
               onTap: () => onChatTap(chat),
             );
           },
-          separatorBuilder: (context, index) => const SizedBox(height: 8),
+          separatorBuilder: (context, index) => SizedBox(height: 8),
           itemCount: chats.length,
         );
       },
@@ -43,13 +43,13 @@ class ChatsList extends StatelessWidget {
 }
 
 class _EmptyChatsView extends StatelessWidget {
-  const _EmptyChatsView();
+  _EmptyChatsView();
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -60,15 +60,15 @@ class _EmptyChatsView extends StatelessWidget {
                 context,
               ).colorScheme.primary.withValues(alpha: 0.7),
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'No chats yet',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               'Tap the + button to start a secure conversation by nickname.',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -82,13 +82,13 @@ class _EmptyChatsView extends StatelessWidget {
 }
 
 class _ChatTile extends StatelessWidget {
-  const _ChatTile({
+  final Chat chat;
+  final VoidCallback onTap;
+
+  _ChatTile({
     required this.chat,
     required this.onTap,
   });
-
-  final Chat chat;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +102,7 @@ class _ChatTile extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           child: Text(
             chat.participantNickname.isNotEmpty
@@ -112,7 +112,7 @@ class _ChatTile extends StatelessWidget {
         ),
         title: Text(
           chat.participantNickname,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -120,7 +120,7 @@ class _ChatTile extends StatelessWidget {
           'Updated: ${_formatTime(updatedAt)}',
           style: theme.textTheme.bodySmall,
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Icon(Icons.chevron_right),
       ),
     );
   }

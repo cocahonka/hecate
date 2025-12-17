@@ -6,14 +6,14 @@ import 'package:yx_state/yx_state.dart';
 import 'package:yx_state_flutter/yx_state_flutter.dart';
 
 class ChatMessagesList extends StatelessWidget {
-  const ChatMessagesList({
+  final StateReadable<ChatsState> stateReadable;
+  final String chatId;
+
+  ChatMessagesList({
     required this.stateReadable,
     required this.chatId,
     super.key,
   });
-
-  final StateReadable<ChatsState> stateReadable;
-  final String chatId;
 
   @override
   Widget build(BuildContext context) {
@@ -27,14 +27,14 @@ class ChatMessagesList extends StatelessWidget {
         final messages = chat?.messages;
 
         if (chat == null || messages == null || messages.isEmpty) {
-          return const _EmptyMessagesView();
+          return _EmptyMessagesView();
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           reverse: true,
           itemBuilder: (context, index) {
-            final message = messages[messages.length - 1 - index];
+            final message = messages[index];
             final isMine = message.nickname != chat.participantNickname;
 
             return _MessageBubble(
@@ -42,7 +42,7 @@ class ChatMessagesList extends StatelessWidget {
               isMine: isMine,
             );
           },
-          separatorBuilder: (context, index) => const SizedBox(height: 4),
+          separatorBuilder: (context, index) => SizedBox(height: 4),
           itemCount: messages.length,
         );
       },
@@ -51,13 +51,13 @@ class ChatMessagesList extends StatelessWidget {
 }
 
 class _EmptyMessagesView extends StatelessWidget {
-  const _EmptyMessagesView();
+  _EmptyMessagesView();
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -68,15 +68,15 @@ class _EmptyMessagesView extends StatelessWidget {
                 alpha: 0.7,
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'No messages yet',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               'Start your first end‑to‑end encrypted message in this chat.',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -90,26 +90,26 @@ class _EmptyMessagesView extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
+  final Message message;
+  final bool isMine;
+
+  _MessageBubble({
     required this.message,
     required this.isMine,
   });
-
-  final Message message;
-  final bool isMine;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bgColor = isMine
         ? theme.colorScheme.primary
-        : theme.colorScheme.surfaceVariant;
+        : theme.colorScheme.surfaceContainerHighest;
     final textColor = isMine ? Colors.white : theme.colorScheme.onSurface;
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: BoxConstraints(
           maxWidth: 360,
         ),
         child: DecoratedBox(
@@ -121,7 +121,7 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
+            padding: EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 8,
             ),
@@ -138,7 +138,7 @@ class _MessageBubble extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   _formatTime(message.createdAt.toLocal()),
                   style: TextStyle(

@@ -20,11 +20,11 @@ class ChatsScreen extends StatelessWidget {
 }
 
 class _ChatsScopeHost extends StatefulWidget {
-  const _ChatsScopeHost({
+  final AppScope appScope;
+
+  _ChatsScopeHost({
     required this.appScope,
   });
-
-  final AppScope appScope;
 
   @override
   State<_ChatsScopeHost> createState() => _ChatsScopeHostState();
@@ -59,7 +59,7 @@ class _ChatsScopeHostState extends State<_ChatsScopeHost> {
             logout: () => widget.appScope.auth.interactor.logout(),
           );
         },
-        placeholder: const Center(
+        placeholder: Center(
           child: CircularProgressIndicator(),
         ),
       ),
@@ -68,13 +68,13 @@ class _ChatsScopeHostState extends State<_ChatsScopeHost> {
 }
 
 class _ChatsScreen extends StatefulWidget {
-  const _ChatsScreen({
+  final ChatsScope scope;
+  final VoidCallback logout;
+
+  _ChatsScreen({
     required this.scope,
     required this.logout,
   });
-
-  final ChatsScope scope;
-  final VoidCallback logout;
 
   @override
   State<_ChatsScreen> createState() => _ChatsScreenState();
@@ -90,19 +90,9 @@ class _ChatsScreenState extends State<_ChatsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chats'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              // ignore: discarded_futures
-              interactor.updateChatsList();
-            },
-          ),
-        ],
+        title: Text('Chats'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(32),
+          preferredSize: Size.fromHeight(32),
           child: ChatsStatusBar(
             stateReadable: stateReadable,
           ),
@@ -125,9 +115,9 @@ class _ChatsScreenState extends State<_ChatsScreen> {
             heroTag: 'logout_fab',
             tooltip: 'Logout',
             onPressed: () => widget.logout(),
-            child: const Icon(Icons.logout),
+            child: Icon(Icons.logout),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           FloatingActionButton.small(
             heroTag: 'refresh_chats_fab',
             tooltip: 'Refresh chats',
@@ -135,9 +125,9 @@ class _ChatsScreenState extends State<_ChatsScreen> {
               // ignore: discarded_futures
               interactor.updateChatsList();
             },
-            child: const Icon(Icons.refresh),
+            child: Icon(Icons.refresh),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           CreateChatFab(
             onCreateChat: ({required participantNickname}) =>
                 interactor.createChat(participantNickname: participantNickname),
