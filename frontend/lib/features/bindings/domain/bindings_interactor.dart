@@ -275,8 +275,8 @@ final class BindingsInteractorImpl implements BindingsInteractor {
     await _stateManager.setOpened(handle: state.handle);
 
     return (
-      myEncryptedKey: json.encode(result.aesEnvelopes.first.toJson()),
-      participantEncryptedKey: json.encode(result.aesEnvelopes.last.toJson()),
+      myEncryptedKey: json.encode(result.aesEnvelopes.last.toJson()),
+      participantEncryptedKey: json.encode(result.aesEnvelopes.first.toJson()),
     );
   }
 
